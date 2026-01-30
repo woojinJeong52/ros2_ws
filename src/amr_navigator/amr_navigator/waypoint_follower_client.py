@@ -9,9 +9,9 @@ from action_msgs.msg import GoalStatus
 class WaypointFollowerClient(Node):
     def __init__(self):
         super().__init__('waypoint_follower_client')
-        # from control_center 
+        # from control_center
         self.control_from_center = self.create_subscription(String, '/control_from_center', self.control_from_center_callback, 10)
-        # to control_center 
+        # to control_center
         self.control_from_amr = self.create_publisher(String, '/control_from_amr', 10)
         self._action_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
         self.subscription = self.create_subscription(
@@ -35,7 +35,7 @@ class WaypointFollowerClient(Node):
             if self.waypoints:
                 self.get_logger().info(f'Received waypoints: {self.waypoints}')
                 if self.msg_center in ['d1_start', 'd2_start', 'd3_start']:
-                    
+
                     self.send_goal(self.waypoints)
                     msg1 = String()
                     msg1.data = 'driving_start'
@@ -44,7 +44,7 @@ class WaypointFollowerClient(Node):
                     self.get_logger().warn('No valid command received before sending goal')
             else:
                 self.get_logger().warn('No valid waypoints received')
-    
+
     def control_from_center_callback(self, msg):  #None 들어오는건 안받음.!
         self.get_logger().info(f'msg_center = {self.msg_center} from control_from_center_callback')
         if msg.data in ['d1_start', 'd2_start', 'd3_start']:
@@ -56,12 +56,6 @@ class WaypointFollowerClient(Node):
                 self.cmd_old = msg.data
 
 
-
-        
-            
-    
-
-        
         elif msg.data == 'kill':
             self.get_logger().info('Received kill command, cancelling current goal.')
             self.cancel_goal()
