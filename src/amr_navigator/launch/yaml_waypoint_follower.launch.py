@@ -16,6 +16,13 @@ def generate_launch_description():
     auto_start = LaunchConfiguration('auto_start')
     repeat = LaunchConfiguration('repeat')
     repeat_delay_sec = LaunchConfiguration('repeat_delay_sec')
+    arrive_topic = LaunchConfiguration('arrive_topic')
+    done_topic = LaunchConfiguration('done_topic')
+    arrive_prefix = LaunchConfiguration('arrive_prefix')
+    done_prefix = LaunchConfiguration('done_prefix')
+    wait_for_done = LaunchConfiguration('wait_for_done')
+    require_done_match = LaunchConfiguration('require_done_match')
+    continue_on_miss = LaunchConfiguration('continue_on_miss')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -48,6 +55,41 @@ def generate_launch_description():
             default_value='0.0',
             description='Delay before repeating sequence (seconds)',
         ),
+        DeclareLaunchArgument(
+            'arrive_topic',
+            default_value='serial_tx',
+            description='Topic to publish arrival flags',
+        ),
+        DeclareLaunchArgument(
+            'done_topic',
+            default_value='serial_rx',
+            description='Topic to subscribe for done flags',
+        ),
+        DeclareLaunchArgument(
+            'arrive_prefix',
+            default_value='ARRIVED',
+            description='Prefix for arrival flag (e.g. ARRIVED:point_name)',
+        ),
+        DeclareLaunchArgument(
+            'done_prefix',
+            default_value='DONE',
+            description='Prefix for done flag (e.g. DONE:point_name)',
+        ),
+        DeclareLaunchArgument(
+            'wait_for_done',
+            default_value='true',
+            description='Wait for done flag before moving to next waypoint',
+        ),
+        DeclareLaunchArgument(
+            'require_done_match',
+            default_value='true',
+            description='Require done flag to include current waypoint name',
+        ),
+        DeclareLaunchArgument(
+            'continue_on_miss',
+            default_value='false',
+            description='Continue sequence even if a waypoint is missed',
+        ),
         Node(
             package='amr_navigator',
             executable='yaml_waypoint_node',
@@ -59,6 +101,13 @@ def generate_launch_description():
                 {'auto_start': auto_start},
                 {'repeat': repeat},
                 {'repeat_delay_sec': repeat_delay_sec},
+                {'arrive_topic': arrive_topic},
+                {'done_topic': done_topic},
+                {'arrive_prefix': arrive_prefix},
+                {'done_prefix': done_prefix},
+                {'wait_for_done': wait_for_done},
+                {'require_done_match': require_done_match},
+                {'continue_on_miss': continue_on_miss},
             ],
             arguments=['--ros-args', '--log-level', 'info'],
             remappings=[],

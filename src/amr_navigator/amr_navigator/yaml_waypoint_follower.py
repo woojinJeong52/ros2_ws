@@ -1,12 +1,12 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from nav2_msgs.action import FollowWaypoints
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
-from std_msgs.msg import Header
+from std_msgs.msg import Header, String
 from ament_index_python.packages import get_package_share_directory
 import yaml
 
@@ -26,17 +26,45 @@ class YamlWaypointFollower(Node):
         self.declare_parameter('repeat', False)
         self.declare_parameter('repeat_delay_sec', 0.0)
 
+        self.declare_parameter('arrive_topic', 'serial_tx')
+        self.declare_parameter('done_topic', 'serial_rx')
+        self.declare_parameter('arrive_prefix', 'ARRIVED')
+        self.declare_parameter('done_prefix', 'DONE')
+        self.declare_parameter('wait_for_done', True)
+        self.declare_parameter('require_done_match', True)
+        self.declare_parameter('continue_on_miss', False)
+
         self._action_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
         self._goal_handle = None
         self._goal_accept = False
         self._repeat_timer = None
 
+        self._arrive_prefix = self.get_parameter('arrive_prefix').value
+        self._done_prefix = self.get_parameter('done_prefix').value
+        self._wait_for_done = bool(self.get_parameter('wait_for_done').value)
+        self._require_done_match = bool(self.get_parameter('require_done_match').value)
+        self._continue_on_miss = bool(self.get_parameter('continue_on_miss').value)
+
+        arrive_topic = self.get_parameter('arrive_topic').value
+        done_topic = self.get_parameter('done_topic').value
+        self._arrive_pub = self.create_publisher(String, arrive_topic, 10)
+        self._done_sub = self.create_subscription(String, done_topic, self._done_callback, 10)
+
         self._waypoints_map, self._sequence, self._frame_id = self._load_waypoints()
+        self._reset_sequence_state()
 
         if self.get_parameter('auto_start').value:
             self._start_sequence()
         else:
             self.get_logger().info('auto_start is false; waiting for manual start.')
+
+    def _reset_sequence_state(self):
+        self._current_index = 0
+        self._current_name: Optional[str] = None
+        self._waiting_for_done = False
+        self._expected_done: Optional[str] = None
+        self._done_names: Set[str] = set()
+        self._done_any = False
 
     def _load_waypoints(self):
         path = self.get_parameter('waypoints_file').value
@@ -82,34 +110,39 @@ class YamlWaypointFollower(Node):
             self.get_logger().warn('No waypoint sequence configured.')
             return
 
-        poses = self._build_sequence(self._sequence)
-        if not poses:
-            self.get_logger().warn('No valid poses to send.')
+        self._reset_sequence_state()
+        self._send_current_goal()
+
+    def _send_current_goal(self):
+        if self._current_index >= len(self._sequence):
+            self.get_logger().info('Waypoint sequence complete.')
+            if self.get_parameter('repeat').value:
+                self._schedule_repeat()
             return
 
+        name = self._sequence[self._current_index]
+        entry = self._waypoints_map.get(name)
+        if entry is None:
+            self.get_logger().warn(f'Waypoint "{name}" not found in YAML; skipping.')
+            self._advance_to_next()
+            return
+
+        pose = self._entry_to_pose(name, entry)
+        if pose is None:
+            self.get_logger().warn(f'Waypoint "{name}" invalid; skipping.')
+            self._advance_to_next()
+            return
+
+        self._current_name = name
         goal_msg = FollowWaypoints.Goal()
-        goal_msg.poses = poses
+        goal_msg.poses = [pose]
 
         self._action_client.wait_for_server()
-        self.get_logger().info(f'Sending {len(poses)} waypoints.')
+        self.get_logger().info(f'Sending waypoint "{name}" ({self._current_index + 1}/{len(self._sequence)})')
         self._send_goal_future = self._action_client.send_goal_async(goal_msg)
         self._send_goal_future.add_done_callback(self._goal_response_callback)
 
-    def _build_sequence(self, sequence: List[str]) -> List[PoseStamped]:
-        poses: List[PoseStamped] = []
-        for name in sequence:
-            entry = self._waypoints_map.get(name)
-            if entry is None:
-                self.get_logger().warn(f'Waypoint "{name}" not found in YAML.')
-                continue
-
-            pose = self._entry_to_pose(name, entry)
-            if pose is None:
-                continue
-            poses.append(pose)
-        return poses
-
-    def _entry_to_pose(self, name: str, entry: Dict) -> PoseStamped:
+    def _entry_to_pose(self, name: str, entry: Dict) -> Optional[PoseStamped]:
         try:
             if 'pose' in entry:
                 pose_list = entry['pose']
@@ -148,7 +181,9 @@ class YamlWaypointFollower(Node):
         self._goal_handle = future.result()
         self._goal_accept = self._goal_handle.accepted
         if not self._goal_accept:
-            self.get_logger().info('Goal rejected :(')
+            self.get_logger().warn('Goal rejected :(')
+            if self._continue_on_miss:
+                self._advance_to_next()
             return
 
         self.get_logger().info('Goal accepted :)')
@@ -159,17 +194,88 @@ class YamlWaypointFollower(Node):
         try:
             result = future.result().result
             missed_waypoints = result.missed_waypoints
-            if not missed_waypoints:
-                self.get_logger().info('All waypoints followed successfully.')
-            else:
-                self.get_logger().info(f'Waypoints missed: {missed_waypoints}')
+            if missed_waypoints:
+                self.get_logger().warn(f'Waypoint "{self._current_name}" missed: {missed_waypoints}')
+                if self._continue_on_miss:
+                    self._advance_to_next()
+                return
+
+            if self._current_name is not None:
+                self._handle_waypoint_arrived(self._current_name)
         except Exception as exc:
             self.get_logger().error(f'Exception in get_result_callback: {exc}')
         finally:
             self._goal_handle = None
             self._goal_accept = False
-            if self.get_parameter('repeat').value:
-                self._schedule_repeat()
+
+    def _handle_waypoint_arrived(self, name: str):
+        self._publish_arrival(name)
+        if self._wait_for_done:
+            self._waiting_for_done = True
+            self._expected_done = name if self._require_done_match else None
+            if self._is_done_ready(name):
+                self._consume_done(name)
+                self._advance_to_next()
+        else:
+            self._advance_to_next()
+
+    def _publish_arrival(self, name: str):
+        msg = String()
+        if self._arrive_prefix:
+            msg.data = f'{self._arrive_prefix}:{name}'
+        else:
+            msg.data = name
+        self._arrive_pub.publish(msg)
+        self.get_logger().info(f'Arrival flag sent: {msg.data}')
+
+    def _done_callback(self, msg: String):
+        done_name = self._parse_done(msg.data)
+        if done_name is None:
+            if not self._require_done_match:
+                self._done_any = True
+        else:
+            self._done_names.add(done_name)
+
+        if self._waiting_for_done and self._current_name is not None:
+            if self._is_done_ready(self._current_name):
+                self._consume_done(self._current_name)
+                self._advance_to_next()
+
+    def _parse_done(self, data: str) -> Optional[str]:
+        text = data.strip()
+        if not text:
+            return None
+        if not self._done_prefix:
+            return text
+        if text == self._done_prefix:
+            return None
+        prefix = f'{self._done_prefix}:'
+        if text.startswith(prefix):
+            return text[len(prefix):].strip() or None
+        return None
+
+    def _is_done_ready(self, name: str) -> bool:
+        if not self._wait_for_done:
+            return True
+        if self._require_done_match:
+            return name in self._done_names
+        return self._done_any or name in self._done_names
+
+    def _consume_done(self, name: str):
+        if self._require_done_match:
+            if name in self._done_names:
+                self._done_names.remove(name)
+        else:
+            if self._done_any:
+                self._done_any = False
+            if name in self._done_names:
+                self._done_names.remove(name)
+
+    def _advance_to_next(self):
+        self._waiting_for_done = False
+        self._expected_done = None
+        self._current_index += 1
+        self._send_current_goal()
 
     def _schedule_repeat(self):
         delay = float(self.get_parameter('repeat_delay_sec').value)

@@ -11,7 +11,9 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, ['launch/serial_test.launch.py']),
-        ('share/' + package_name, ['launch/nav2_catographer.launch.py'])
+        ('share/' + package_name, ['launch/nav2_catographer.launch.py']),
+        ('share/' + package_name, ['launch/serial_flag_bridge.launch.py']),
+        ('share/' + package_name + '/params', ['params/serial_flags.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'test_node = serial_test.test_node_main:main',
+            'serial_flag_bridge = serial_test.serial_flag_bridge:main',
         ],
     },
 )
