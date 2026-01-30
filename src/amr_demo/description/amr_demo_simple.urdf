@@ -1,0 +1,607 @@
+<robot name="amr">
+  <!-- Base Footprint -->
+  <link name="base_link"/>
+
+  <!-- Base Link -->
+  <link name="chassis">
+    <inertial>
+      <origin xyz="0 0 0.18" rpy="0 0 0"/>
+      <mass value="1.37291"/>
+      <inertia ixx="0.0421114" ixy="0" ixz="0" iyy="0.0421114" iyz="0" izz="0.0752549"/>
+    </inertial>
+    <collision name="base_collision">
+      <origin xyz="0 0 0.3" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.6 0.35 0.1"/>
+      </geometry>
+    </collision>
+    <visual name="base_visual">
+      <origin xyz="0 0 0.15" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.6 0.35 0.2"/>
+         <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_body.stl" scale="0.001 0.001 0.001"/> -->
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- IMU Link -->
+  <!-- <link name="imu_link">
+    <sensor name="tb3_imu" type="imu">
+      <imu>
+        <angular_velocity>
+          <x>
+            <noise type="gaussian" mean="0" stddev="0.0002"/>
+          </x>
+          <y>
+            <noise type="gaussian" mean="0" stddev="0.0002"/>
+          </y>
+          <z>
+            <noise type="gaussian" mean="0" stddev="0.0002"/>
+          </z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x>
+            <noise type="gaussian" mean="0" stddev="0.017"/>
+          </x>
+          <y>
+            <noise type="gaussian" mean="0" stddev="0.017"/>
+          </y>
+          <z>
+            <noise type="gaussian" mean="0" stddev="0.017"/>
+          </z>
+        </linear_acceleration>
+      </imu>
+      <plugin name="turtlebot3_imu" filename="libgazebo_ros_imu_sensor.so">
+        <ros>
+          <remapping>~/out:=imu</remapping>
+        </ros>
+      </plugin>
+    </sensor>
+  </link> -->
+
+  <!-- Lidar Link -->
+  <!-- <link name="base_scan">
+    <inertial>
+      <origin xyz="-0.052 0 0.2" rpy="0 0 0"/>
+      <mass value="0.114"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+    <collision name="lidar_sensor_collision">
+      <origin xyz="-0.052 0 0.2" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.0508" length="0.055"/>
+      </geometry>
+    </collision>
+    <visual name="lidar_sensor_visual">
+      <origin xyz="-0.064 0 0.2" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="model://turtlebot3_common/meshes/lds.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+    <sensor name="hls_lfcd_lds" type="ray">
+      <origin xyz="-0.064 0 0.2" rpy="0 0 0"/>
+      <update_rate value="5"/>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples value="360"/>
+            <resolution value="1"/>
+            <min_angle value="0"/>
+            <max_angle value="6.28"/>
+          </horizontal>
+        </scan>
+        <range>
+          <min value="0.12"/>
+          <max value="30"/>
+          <resolution value="0.015"/>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </ray>
+      <plugin name="turtlebot3_laserscan" filename="libgazebo_ros_ray_sensor.so">
+        <ros>
+          <remapping>~/out:=scan</remapping>
+        </ros>
+        <output_type>sensor_msgs/LaserScan</output_type>
+        <frame_name>base_scan</frame_name>
+      </plugin>
+    </sensor>
+  </link> -->
+
+  <!-- Left Wheel Link -->
+  <link name="wheel_left_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+    </inertial>
+    <collision name="wheel_left_collision">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.046"/>
+      </geometry>
+      <!-- <surface>
+        <friction>
+          <ode>
+            <mu value="100000"/>
+            <mu2 value="100000"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <kp value="100000"/>
+            <kd value="1"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+    <visual name="wheel_left_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.046"/>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_wheel.stl" scale="0.001 0.001 0.001"/> -->
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Right Wheel Link -->
+  <link name="wheel_right_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+    </inertial>
+    <collision name="wheel_right_collision">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.046"/>
+      </geometry>
+      <!-- <surface>
+        <friction>
+          <ode>
+            <mu value="100000"/>
+            <mu2 value="100000"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <kp value="100000"/>
+            <kd value="1"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+    <visual name="wheel_right_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.046"/>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_wheel.stl" scale="0.001 0.001 0.001"/> -->
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Other links and joints (similar structure) -->
+  <!-- caster sup link-->
+  <link name='caster_back_right_link'>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.1"/>
+        <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+      </inertial>
+      
+      
+      <visual name='caster_back_right_visual'>
+        <!-- <pose>-0.2 -0.13 0.068 0 0 0</pose> -->
+        <geometry>
+            <cylinder radius="0.001" length="0.001"/>
+            <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster_sup.stl" scale="0.001 0.001 0.001"/> -->
+        </geometry>
+      </visual>
+  </link>
+
+  <link name='caster_back_left_link'>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.1"/>
+        <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+      </inertial>
+      <!-- <inertial>
+        <pose>-0.2 0.13 0.068 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.00001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.00001</izz>
+        </inertia>
+      </inertial> -->
+       
+      <visual name='caster_back_left_visual'>
+        <!-- <pose>-0.2 0.13 0.068 0 0 0</pose> -->
+        <geometry>
+            <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster_sup.stl" scale="0.001 0.001 0.001"/> -->
+            <cylinder radius="0.001" length="0.001"/>
+        </geometry>
+      </visual>
+  </link>
+    
+
+  <link name='caster_front_right_link'>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.1"/>
+        <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+      </inertial>
+      <!-- <inertial>
+        <pose>0.2 -0.13 0.068 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.00001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.00001</izz>
+        </inertia>
+      </inertial> -->
+       
+      <visual name='caster_front_right_visual'>
+        <!-- <pose>0.2 -0.13 0.068 0 0 0</pose> -->
+        <geometry>
+            <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster_sup.stl" scale="0.001 0.001 0.001"/> -->
+            <cylinder radius="0.001" length="0.001"/>
+        </geometry>
+      </visual>
+  </link>
+
+
+  <link name='caster_front_left_link'>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.1"/>
+        <inertia ixx="1.11756e-05" ixy="-4.23698e-11" ixz="-5.93817e-09" iyy="1.11924e-05" iyz="-1.44001e-11" izz="2.07126e-05"/>
+      </inertial>
+      <!-- <inertial>
+        <pose>0.2 0.13 0.068 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.00001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.00001</izz>
+        </inertia>
+      </inertial> -->
+       
+      <visual name='caster_front_left_visual'>
+        <!-- <pose>0.2 0.13 0.068 0 0 0</pose> -->
+        <geometry>
+            <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster_sup.stl" scale="0.001 0.001 0.001"/> -->
+            <cylinder radius="0.001" length="0.001"/>
+        </geometry>
+      </visual>
+  </link>
+
+  <link name="caster_wheel_back_right_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-05" ixy="0" ixz="0" iyy="1e-05" iyz="0" izz="1e-05"/>
+    </inertial>
+    <visual name="caster_wheel_back_right_visual">
+      <!-- <origin xyz="-0.2225 -0.13 0.025" rpy="0 0 0"/> -->
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster.stl" scale="0.001 0.001 0.001"/> -->
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+    </visual>
+    <collision name="caster_wheel_back_right_collision">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+      <!-- <surface>
+        <friction>
+          <ode>
+            <mu value="100000.0"/>
+            <mu2 value="100000.0"/>
+            <fdir1 x="0" y="0" z="0"/>
+            <slip1 value="0.0"/>
+            <slip2 value="0.0"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <soft_cfm value="0"/>
+            <soft_erp value="0.2"/>
+            <kp value="1e+5"/>
+            <kd value="1"/>
+            <max_vel value="0.01"/>
+            <min_depth value="0.001"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+  </link>
+
+  <!-- Caster Wheel Back Left Link -->
+  <link name="caster_wheel_back_left_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-05" ixy="0" ixz="0" iyy="1e-05" iyz="0" izz="1e-05"/>
+    </inertial>
+    <visual name="caster_wheel_back_left_visual">
+      <!-- <origin xyz="-0.2225 0.13 0.025" rpy="0 0 0"/> -->
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster.stl" scale="0.001 0.001 0.001"/> -->
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+    </visual>
+    <collision name="caster_wheel_back_left_collision">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+      <!-- <surface>
+        
+        <friction>
+          <ode>
+            <mu value="100000.0"/>
+            <mu2 value="100000.0"/>
+            <fdir1 x="0" y="0" z="0"/>
+            <slip1 value="0.0"/>
+            <slip2 value="0.0"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <soft_cfm value="0"/>
+            <soft_erp value="0.2"/>
+            <kp value="1e+5"/>
+            <kd value="1"/>
+            <max_vel value="0.01"/>
+            <min_depth value="0.001"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+  </link>
+
+  <!-- Caster Wheel Front Right Link -->
+  <link name="caster_wheel_front_right_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-05" ixy="0" ixz="0" iyy="1e-05" iyz="0" izz="1e-05"/>
+    </inertial>
+    <visual name="caster_wheel_front_right_visual">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <!-- <origin xyz="0.1775 -0.13 0.025" rpy="0 0 0"/> -->
+      <geometry>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster.stl" scale="0.001 0.001 0.001"/> -->
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+    </visual>
+    <collision name="caster_wheel_front_right_collision">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+      <!-- <surface>
+        
+        <friction>
+          <ode>
+            <mu value="100000.0"/>
+            <mu2 value="100000.0"/>
+            <fdir1 x="0" y="0" z="0"/>
+            <slip1 value="0.0"/>
+            <slip2 value="0.0"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <soft_cfm value="0"/>
+            <soft_erp value="0.2"/>
+            <kp value="1e+5"/>
+            <kd value="1"/>
+            <max_vel value="0.01"/>
+            <min_depth value="0.001"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+  </link>
+
+  <!-- Caster Wheel Front Left Link -->
+  <link name="caster_wheel_front_left_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-05" ixy="0" ixz="0" iyy="1e-05" iyz="0" izz="1e-05"/>
+    </inertial>
+    <visual name="caster_wheel_front_left_visual">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <!-- <origin xyz="0.1775 0.13 0.025" rpy="0 0 0"/> -->
+      <geometry>
+        <!-- <mesh filename="/home/jinho/ros2_ws/src/amr_demo/description/meshes/amr_caster.stl" scale="0.001 0.001 0.001"/> -->
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+    </visual>
+    <collision name="caster_wheel_front_left_collision">
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <geometry>
+        <cylinder radius="0.025" length="0.026"/>
+      </geometry>
+      <!-- <surface>
+          <ode>
+            <mu value="100000.0"/>
+            <mu2 value="100000.0"/>
+            <fdir1 x="0" y="0" z="0"/>
+            <slip1 value="0.0"/>
+            <slip2 value="0.0"/>
+          </ode>
+        </friction>
+        <contact>
+          <ode>
+            <soft_cfm value="0"/>
+            <soft_erp value="0.2"/>
+            <kp value="1e+5"/>
+            <kd value="1"/>
+            <max_vel value="0.01"/>
+            <min_depth value="0.001"/>
+          </ode>
+        </contact>
+      </surface> -->
+    </collision>
+  </link>
+
+
+  <!-- Joint definitions -->
+  <joint name="base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis"/>
+    <origin xyz="0 0 0.001" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="wheel_left_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="wheel_left_link"/>
+    <origin xyz="0 0.145 0.085" rpy="-1.57 0 0"/>
+    <!-- <axis xyz="0 0 1"/> -->
+    <!-- <limit lower="-1e+16" upper="1e+16"/> -->
+  </joint>
+
+  <joint name="wheel_right_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="wheel_right_link"/>
+    <origin xyz="0 -0.145 0.085" rpy="1.57 0 0"/>
+    <!-- <axis xyz="0 0 -1"/> -->
+    <!-- <limit lower="-1e+16" upper="1e+16"/> -->
+  </joint>
+
+  <joint name="caster_back_right_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="caster_back_right_link"/>
+    <origin xyz="-0.2 -0.13 0.068" rpy="0 0 0"/>
+    <!-- <axis xyz="0 0 1"/> -->
+  </joint>
+
+  <joint name="caster_back_left_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="caster_back_left_link"/>
+    <origin xyz="-0.2 0.13 0.068" rpy="0 0 0"/>
+    <!-- <axis xyz="0 0 1"/> -->
+  </joint>
+
+  <joint name="caster_front_right_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="caster_front_right_link"/>
+    <origin xyz="0.2 -0.13 0.068" rpy="0 0 0"/>
+    <!-- <axis xyz="0 0 1"/> -->
+  </joint>
+
+  <joint name="caster_front_left_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="caster_front_left_link"/>
+    <origin xyz="0.2 0.13 0.068" rpy="0 0 0"/>
+    <!-- <axis xyz="0 0 1"/> -->
+  </joint>
+
+  <joint name="caster_wheel_back_right_joint" type="fixed">
+    <parent link="caster_back_right_link"/>
+    <child link="caster_wheel_back_right_link"/>
+    <origin xyz="-0.0225 0 -0.043" rpy="0 0 0"/>
+    <!-- <axis xyz="0 1 0"/> -->
+  </joint>
+
+  <joint name="caster_wheel_back_left_joint" type="fixed">
+    <parent link="caster_back_left_link"/>
+    <child link="caster_wheel_back_left_link"/>
+    <origin xyz="-0.0225 0 -0.043" rpy="0 0 0"/>
+    <!-- <axis xyz="0 1 0"/> -->
+  </joint>
+
+  <joint name="caster_wheel_front_right_joint" type="fixed">
+    <parent link="caster_front_right_link"/>
+    <child link="caster_wheel_front_right_link"/>
+    <origin xyz="-0.0225 -0 -0.043" rpy="0 0 0"/>
+    <!-- <axis xyz="0 1 0"/> -->
+  </joint>
+
+  <joint name="caster_wheel_front_left_joint" type="fixed">
+    <parent link="caster_front_left_link"/>
+    <child link="caster_wheel_front_left_link"/>
+    <origin xyz="-0.0225 0 -0.043" rpy="0 0 0"/>
+    <!-- <axis xyz="0 1 0"/> -->
+  </joint>
+
+  <!-- Other joints (similar structure) -->
+
+  <!-- Plugins -->
+  <!-- <gazebo>
+    <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <ros>
+        <remapping>/tf:=tf</remapping>
+      </ros>
+      <update_rate>30</update_rate>
+      <left_joint>wheel_left_joint</left_joint>
+      <right_joint>wheel_right_joint</right_joint>
+      <wheel_separation>0.29</wheel_separation>
+      <wheel_diameter>0.17</wheel_diameter>
+      <max_wheel_torque>20</max_wheel_torque>
+      <max_wheel_acceleration>1.0</max_wheel_acceleration>
+      <command_topic>/cmd_vel</command_topic>
+      <publish_odom>1</publish_odom>
+      <publish_odom_tf>1</publish_odom_tf>
+      <publish_wheel_tf>1</publish_wheel_tf>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+    </plugin>
+  </gazebo> -->
+    <!-- <plugin name="turtlebot3_joint_state" filename="libgazebo_ros_joint_state_publisher.so">
+      <ros>
+        <remapping>~/out:=joint_states</remapping>
+      </ros>
+      <update_rate>30</update_rate>
+      <joint_name>wheel_left_joint</joint_name>
+      <joint_name>wheel_right_joint</joint_name>
+      <joint_name>caster_back_left_joint</joint_name>
+      <joint_name>caster_back_right_joint</joint_name>
+      <joint_name>caster_front_left_joint</joint_name>
+      <joint_name>caster_front_right_joint</joint_name>
+    </plugin>
+  </gazebo> -->
+
+  <!-- <gazebo reference="caster_wheel_front_right_link">
+    <mu1 value="0.001"/>
+    <mu2 value="0.001"/>
+  </gazebo>
+  <gazebo reference="caster_wheel_front_left_link">
+    <mu1 value="0.001"/>
+    <mu2 value="0.001"/>
+  </gazebo>
+  <gazebo reference="caster_wheel_back_right_link">
+    <mu1 value="0.001"/>
+    <mu2 value="0.001"/>
+  </gazebo>
+  <gazebo reference="caster_wheel_back_left_link">
+    <mu1 value="0.001"/>
+    <mu2 value="0.001"/>
+  </gazebo>
+   -->
+
+
+
+
+
+</robot>
