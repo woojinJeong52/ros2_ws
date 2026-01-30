@@ -117,7 +117,7 @@ class WaypointFollowerClient(Node):
             self.msg_center = None
             self.get_logger().info(f'--------------------------------------------------')
             self.get_logger().info(f'--------------------------------------------------')    
-            self.get_logger().info(f'--------------------------------------------------')        
+            self.get_logger().info(f'--------------------------------------------------')    
             self.get_logger().info(f'msg_center = {self.msg_center} get_result_callback')    
             self.get_logger().info(f'--------------------------------------------------')    
             self.get_logger().info(f'--------------------------------------------------')    

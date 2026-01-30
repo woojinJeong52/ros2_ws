@@ -51,7 +51,7 @@ def generate_launch_description():
                             'localization_launch.py'
                         )
                     ),
-                    launch_arguments={'map': os.path.expandvars('$HOME/ros2_ws/src/amr/map/0529_1f.yaml')}.items(),
+                    launch_arguments={'map': os.path.expandvars('$HOME/ros2_ws/src/amr/0130.yaml')}.items(),
                 ),
             ]
         ),
@@ -73,15 +73,29 @@ def generate_launch_description():
             ]
         ),
 
-        # Sixth Run: ros2 run amr_navigator waypoint_node after 25 seconds
+        # Sixth Launch: amr_navigator yaml waypoint follower after 22 seconds
         TimerAction(
             period=10.0,
             actions=[
-                Node(
-                    package='amr_navigator',
-                    executable='waypoint_node',
-                    name='waypoint_node'
-                )
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(
+                            get_package_share_directory('amr_navigator'),
+                            'launch',
+                            'yaml_waypoint_follower.launch.py'
+                        )
+                    ),
+                    launch_arguments={
+                        'waypoints_file': os.path.join(
+                            get_package_share_directory('amr_navigator'),
+                            'params',
+                            'waypoints.yaml',
+                        ),
+                        'sequence': '[initial_point,work_station1,work_station2]',
+                        'repeat': 'true',
+                        'repeat_delay_sec': '2.0',
+                    }.items(),
+                ),
             ]
         ),
     ])

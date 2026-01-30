@@ -10,6 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/params', ['params/waypoints.yaml']),
+        ('share/' + package_name + '/launch', ['launch/yaml_waypoint_follower.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -22,6 +24,7 @@ setup(
         'console_scripts': [
             'navigator_node = amr_navigator.navigator:main',
             'waypoint_node = amr_navigator.waypoint_follower_client:main',
+            'yaml_waypoint_node = amr_navigator.yaml_waypoint_follower:main',
         ],
     },
 )
