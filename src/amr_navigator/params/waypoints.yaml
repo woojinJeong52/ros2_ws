@@ -1,12 +1,9 @@
 frame_id: map
 waypoints:
-  initial_point:
-    position: {x: -0.5317093729972839, y: -1.300057053565979, z: 0.0}
-    orientation: {x: 0.0, y: 0.0, z: -0.7228868987196777, w: 0.6909663752017506}
   work_station1:
     position: {x: -0.1599111557006836, y: 0.18245379626750946, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: -0.012461900208890283, w: 0.999922347506637}
   work_station2:
     position: {x: 2.209376335144043, y: 0.41247016191482544, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: -0.014250750587455067, w: 0.9998984528979401}
-sequence: [initial_point, work_station1, work_station2]
+sequence: [work_station1, work_station2]
