@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'test_node = serial_test.test_node_main:main',
             'serial_flag_bridge = serial_test.serial_flag_bridge:main',
+            'serial_comm_fsm_node = serial_test.serial_comm_fsm_node:main',
         ],
     },
 )

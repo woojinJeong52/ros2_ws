@@ -50,7 +50,7 @@ def generate_launch_description():
         DeclareLaunchArgument('sequence', default_value='', description='Override waypoint sequence (e.g. [a,b])'),
         DeclareLaunchArgument('frame_id', default_value='map', description='Frame ID for waypoints'),
         DeclareLaunchArgument('auto_start', default_value='true', description='Start sequence immediately'),
-        DeclareLaunchArgument('repeat', default_value='false', description='Repeat sequence after completion'),
+        DeclareLaunchArgument('repeat', default_value='true', description='Repeat sequence after completion'),
         DeclareLaunchArgument('repeat_delay_sec', default_value='0.0', description='Delay before repeating (seconds)'),
         DeclareLaunchArgument('continue_on_miss', default_value='false', description='Continue if waypoint missed'),
 
@@ -125,6 +125,8 @@ def generate_launch_description():
                 # Nav handshake topics
                 {'wp_arrive_topic': wp_arrive_topic},
                 {'wp_done_topic': wp_done_topic},
+                {'arrive_prefix': arrive_prefix},
+                {'done_prefix': done_prefix},
 
                 # Serial port
                 {'port': port},
