@@ -74,28 +74,28 @@ def generate_launch_description():
         ),
 
         # Sixth Launch: amr_navigator yaml waypoint follower after 22 seconds
-        TimerAction(
-            period=10.0,
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        os.path.join(
-                            get_package_share_directory('amr_navigator'),
-                            'launch',
-                            'yaml_waypoint_follower.launch.py'
-                        )
-                    ),
-                    launch_arguments={
-                        'waypoints_file': os.path.join(
-                            get_package_share_directory('amr_navigator'),
-                            'params',
-                            'waypoints.yaml',
-                        ),
-                        'sequence': '[initial_point,work_station1,work_station2]',
-                        'repeat': 'true',
-                        'repeat_delay_sec': '2.0',
-                    }.items(),
-                ),
-            ]
-        ),
+        # TimerAction(
+        #     period=10.0,
+        #     actions=[
+        #         IncludeLaunchDescription(
+        #             PythonLaunchDescriptionSource(
+        #                 os.path.join(
+        #                     get_package_share_directory('amr_navigator'),
+        #                     'launch',
+        #                     'yaml_waypoint_follower.launch.py'
+        #                 )
+        #             ),
+        #             launch_arguments={
+        #                 'waypoints_file': os.path.join(
+        #                     get_package_share_directory('amr_navigator'),
+        #                     'params',
+        #                     'waypoints.yaml',
+        #                 ),
+        #                 'sequence': '[initial_point,work_station1,work_station2]',
+        #                 'repeat': 'true',
+        #                 'repeat_delay_sec': '2.0',
+        #             }.items(),
+        #         ),
+        #     ]
+        # ),
     ])
