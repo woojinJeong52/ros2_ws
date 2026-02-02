@@ -21,6 +21,9 @@ class SerialCommFsmNode(Node):
         self.declare_parameter('line_ending', '\n')
         self.declare_parameter('ws_map_yaml', '{}')
         self.declare_parameter('task_plan_yaml', '{}')
+        self.declare_parameter('task_policy', 'ws_plan')  # ws_plan | first_pick_then_place_pick
+        self.declare_parameter('pick_task', 'PICK3')
+        self.declare_parameter('place_task', 'PLACE3')
         self.declare_parameter('done_timeout_sec', 0.0)
         self.declare_parameter('resend_sec', 0.0)
         self.declare_parameter('max_resends', 0)
@@ -37,6 +40,10 @@ class SerialCommFsmNode(Node):
         self._resend_sec = float(self.get_parameter('resend_sec').value)
         self._max_resends = int(self.get_parameter('max_resends').value)
         self._fail_policy = str(self.get_parameter('fail_policy').value).lower()
+
+        self._task_policy = str(self.get_parameter('task_policy').value).lower()
+        self._pick_task = str(self.get_parameter('pick_task').value)
+        self._place_task = str(self.get_parameter('place_task').value)
 
         self._ws_map = self._normalize_ws_map(self._load_yaml_dict(self.get_parameter('ws_map_yaml').value))
         self._task_plan = self._normalize_task_plan(
@@ -67,7 +74,12 @@ class SerialCommFsmNode(Node):
         self._resend_timer = None
         self._timeout_timer = None
 
-        self.get_logger().info('Serial comm FSM ready (ARRIVED->DONE, FAIL ignored).')
+        # Global policy state: the very first stop should be PICK only. After that, always PLACE then PICK.
+        self._did_first_pick = False
+
+        self.get_logger().info(
+            f'Serial comm FSM ready (policy={self._task_policy}, ARRIVED->DONE, FAIL ignored).'
+        )
 
     def _load_yaml_dict(self, value):
         if isinstance(value, dict):
@@ -112,6 +124,15 @@ class SerialCommFsmNode(Node):
                 plan[ws_id] = [str(task) for task in tasks]
         return plan
 
+    def _tasks_for_ws(self, ws_id: str):
+        if self._task_policy == 'first_pick_then_place_pick':
+            if not self._did_first_pick:
+                return [self._pick_task]
+            return [self._place_task, self._pick_task]
+
+        # Default: configured per-workstation plan.
+        return self._task_plan.get(ws_id, [])
+
     def _on_wp_arrive(self, msg: String):
         wp_name = self._parse_wp_arrive(msg.data)
         if wp_name is None:
@@ -146,7 +167,7 @@ class SerialCommFsmNode(Node):
             self._publish_wp_done(wp_name)
             return
 
-        tasks = self._task_plan.get(ws_id, [])
+        tasks = self._tasks_for_ws(ws_id)
         if not tasks:
             self.get_logger().info(f'No tasks for WS "{ws_id}". Skipping.')
             self._publish_wp_done(wp_name)
@@ -205,6 +226,11 @@ class SerialCommFsmNode(Node):
         return ws_id, task
 
     def _advance_task(self):
+        completed_task = self._tasks[self._task_index]
+        if self._task_policy == 'first_pick_then_place_pick' and not self._did_first_pick:
+            if completed_task == self._pick_task:
+                self._did_first_pick = True
+
         self._task_index += 1
         if self._task_index >= len(self._tasks):
             self._finish_waypoint()
@@ -215,6 +241,9 @@ class SerialCommFsmNode(Node):
         self._start_timeout_timer()
 
     def _finish_waypoint(self):
+        if self._task_policy == 'first_pick_then_place_pick' and not self._did_first_pick:
+            # First stop completed; from the next stop onward we will always PLACE then PICK.
+            self._did_first_pick = True
         if self._current_wp is not None:
             self._publish_wp_done(self._current_wp)
         self._reset_state()

@@ -20,7 +20,9 @@ class YamlWaypointFollower(Node):
             'waypoints.yaml',
         )
         self.declare_parameter('waypoints_file', default_yaml)
-        self.declare_parameter('sequence', [])
+        # NOTE: An empty list is ambiguous in rclpy and gets inferred as BYTE_ARRAY.
+        # Use an empty string instead and parse into a list when provided.
+        self.declare_parameter('sequence', '')
         self.declare_parameter('frame_id', 'map')
         self.declare_parameter('auto_start', True)
         self.declare_parameter('repeat', False)

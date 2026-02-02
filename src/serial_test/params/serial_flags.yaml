@@ -1,6 +1,6 @@
 serial_flag_bridge:
   ros__parameters:
-    port: /dev/ttyUSB4
+    port: /dev/ttyUSB0
     baudrate: 115200
     timeout: 0.1
     line_ending: "\n"

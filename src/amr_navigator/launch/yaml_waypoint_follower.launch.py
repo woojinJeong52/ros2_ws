@@ -39,6 +39,9 @@ def generate_launch_description():
     # comm.md mapping & task plan (Robot A scenario)
     ws_map_yaml = LaunchConfiguration('ws_map_yaml')
     task_plan_yaml = LaunchConfiguration('task_plan_yaml')
+    task_policy = LaunchConfiguration('task_policy')
+    pick_task = LaunchConfiguration('pick_task')
+    place_task = LaunchConfiguration('place_task')
 
     # Reliability
     done_timeout_sec = LaunchConfiguration('done_timeout_sec')
@@ -74,15 +77,22 @@ def generate_launch_description():
         # Mapping: waypoint_name -> WSx (comm.md)
         DeclareLaunchArgument(
             'ws_map_yaml',
-            default_value='{work_station1: WS1, work_station2: WS2}',
+            default_value='{work_station1: WS1, work_station2: WS2, work_station3: WS3}',
             description='YAML dict mapping waypoint name to WS id',
         ),
         # Task plan: WSx -> [TASK...]
         DeclareLaunchArgument(
             'task_plan_yaml',
-            default_value='{WS1: [PICK3], WS2: [PLACE3, PICK3]}',
+            default_value='{WS1: [PICK3], WS2: [PLACE3, PICK3], WS3: [PLACE3, PICK3]}',
             description='YAML dict mapping WS to tasks list (scenario)',
         ),
+        DeclareLaunchArgument(
+            'task_policy',
+            default_value='first_pick_then_place_pick',
+            description='FSM task policy: ws_plan | first_pick_then_place_pick',
+        ),
+        DeclareLaunchArgument('pick_task', default_value='PICK3', description='FSM pick task name'),
+        DeclareLaunchArgument('place_task', default_value='PLACE3', description='FSM place task name'),
 
         # Timeouts / resend
         DeclareLaunchArgument('done_timeout_sec', default_value='120.0', description='Timeout waiting DONE per task'),
@@ -136,8 +146,11 @@ def generate_launch_description():
                 {'line_ending': ParameterValue(line_ending, value_type=str)},
 
                 # Scenario plan
-                {'ws_map_yaml': ws_map_yaml},
-                {'task_plan_yaml': task_plan_yaml},
+                {'ws_map_yaml': ParameterValue(ws_map_yaml, value_type=str)},
+                {'task_plan_yaml': ParameterValue(task_plan_yaml, value_type=str)},
+                {'task_policy': task_policy},
+                {'pick_task': pick_task},
+                {'place_task': place_task},
 
                 # Reliability
                 {'done_timeout_sec': done_timeout_sec},
