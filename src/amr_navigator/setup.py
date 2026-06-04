@@ -25,6 +25,7 @@ setup(
             'navigator_node = amr_navigator.navigator:main',
             'waypoint_node = amr_navigator.waypoint_follower_client:main',
             'yaml_waypoint_node = amr_navigator.yaml_waypoint_follower:main',
+            'waypoint_follower_client_3_12 = amr_navigator.waypoint_follower_client_3_12:main'
         ],
     },
 )

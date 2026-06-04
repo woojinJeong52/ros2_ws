@@ -1,4 +1,16 @@
-# set the udev rule , make the device_port be fixed by rplidar
-#
-KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0777", SYMLINK+="rplidar"
+# # /etc/udev/rules.d/rplidar.rules
+# # Front LiDAR
+# ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB*",
+#   ENV{ID_VENDOR_ID}=="10c4", ENV{ID_MODEL_ID}=="ea60",
+#   ENV{ID_SERIAL_SHORT}=="fa9073be6d89ef11a208a695ef8776e9",
+#   SYMLINK+="ttyUSB_FRONT_LIDAR", GROUP="dialout", MODE="0660"
 
+# # Rear LiDAR
+# ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB*",
+#   ENV{ID_VENDOR_ID}=="10c4", ENV{ID_MODEL_ID}=="ea60",
+#   ENV{ID_SERIAL_SHORT}=="c228a2a43577ed11a911f6fafdf7b791"
+#   SYMLINK+="ttyUSB_REAR_LIDAR", GROUP="dialout", MODE="0660"
+
+
+ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ENV{ID_VENDOR_ID}=="10c4", ENV{ID_MODEL_ID}=="ea60", ENV{ID_SERIAL_SHORT}=="fa9073be6d89ef11a208a695ef8776e9", SYMLINK+="ttyUSB_FRONT_LIDAR", GROUP="dialout", MODE="0660"
+ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ENV{ID_VENDOR_ID}=="10c4", ENV{ID_MODEL_ID}=="ea60", ENV{ID_SERIAL_SHORT}=="c228a2a43577ed11a911f6fafdf7b791", SYMLINK+="ttyUSB_REAR_LIDAR", GROUP="dialout", MODE="0660"

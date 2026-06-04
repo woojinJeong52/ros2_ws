@@ -15,7 +15,7 @@ class SerialCommFsmNode(Node):
         self.declare_parameter('serial_rx_topic', 'serial_rx')
         self.declare_parameter('arrive_prefix', 'ARRIVED')
         self.declare_parameter('done_prefix', 'DONE')
-        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('port', '/dev/ttyUSB_SERIAL_COM')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('timeout', 0.1)
         self.declare_parameter('line_ending', '\n')
@@ -189,10 +189,11 @@ class SerialCommFsmNode(Node):
             return
         task = self._tasks[self._task_index]
         msg = String()
-        msg.data = f'ARRIVED,{self._current_ws},{task}'
+        msg.data = f'ARRIVED,{self._current_ws},{task}' # here here
         self._serial_tx_pub.publish(msg)
         self._last_arrived_msg = msg.data
         self.get_logger().info(f'TX: {msg.data}')
+        
 
     def _on_serial_rx(self, msg: String):
         parsed = self._parse_serial_done(msg.data)

@@ -10,7 +10,7 @@ import serial
 class SerialFlagBridge(Node):
     def __init__(self):
         super().__init__('serial_flag_bridge')
-        self.declare_parameter('port', '/dev/ttyUSB4')
+        self.declare_parameter('port', '/dev/ttyUSB_SERIAL_COM_')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('timeout', 0.1)
         self.declare_parameter('line_ending', '\n')

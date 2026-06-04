@@ -69,7 +69,7 @@ def generate_launch_description():
         DeclareLaunchArgument('require_done_match', default_value='true', description='Nav requires done include wp name'),
 
         # Serial port args (Robot A)
-        DeclareLaunchArgument('port', default_value='/dev/ttyUSB0', description='Serial port'),
+        DeclareLaunchArgument('port', default_value='/dev/ttyUSB2', description='Serial port'),
         DeclareLaunchArgument('baudrate', default_value='115200', description='Serial baudrate'),
         DeclareLaunchArgument('timeout', default_value='0.1', description='Serial timeout seconds'),
         DeclareLaunchArgument('line_ending', default_value='\n', description='Line ending for serial TX'),
