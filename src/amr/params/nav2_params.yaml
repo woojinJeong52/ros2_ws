@@ -198,8 +198,10 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      # robot_radius: 0.22
-      robot_radius: 0.4
+      # URDF chassis size: 0.72 x 0.45 m. Use a rectangular footprint instead of
+      # a circular radius so Nav2 accounts for the robot body's actual corners.
+      footprint: "[[0.36, 0.225], [0.36, -0.225], [-0.36, -0.225], [-0.36, 0.225]]"
+      # footprint_padding: 0.03
 
       plugins: ["voxel_layer", "inflation_layer" ]
       # keepout_filter:
@@ -246,7 +248,9 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
-      robot_radius: 0.4
+      # URDF chassis size: 0.72 x 0.45 m. Use the same footprint as the local costmap.
+      footprint: "[[0.36, 0.225], [0.36, -0.225], [-0.36, -0.225], [-0.36, 0.225]]"
+      footprint_padding: 0.03
       resolution: 0.05
       track_unknown_space: true
       map_topic: /map
