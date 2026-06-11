@@ -92,7 +92,7 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # /scan 전방 edge 데이터 기준 45cm 거리로 정렬
         self.declare_parameter('approach_after_goal', True)
-        self.declare_parameter('target_front_distance', 0.50)
+        self.declare_parameter('target_front_distance', 0.45)
 
         # 허용 오차: 45cm ± 2cm 안에 들어오면 정렬 완료
         self.declare_parameter('target_distance_tolerance', 0.02)
