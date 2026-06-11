@@ -6,9 +6,8 @@ import math
 import rclpy
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion, Twist
-from nav2_msgs.action import BackUp, FollowWaypoints
+from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -16,24 +15,6 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
 
 
-# =========================================================
-# Fixed mission sequence
-# =========================================================
-# 반드시 아래 순서로만 동작한다.
-# 1. storage_shelf_sub_goal
-# 2. storage_shelf_goal
-#    - 전방 3cm 접근
-#    - 20cm 후진
-# 3. workbench_sub_goal
-# 4. workbench_goal
-#    - 전방 3cm 접근
-#    - 20cm 후진
-# 5. customer_counter_sub_goal
-# 6. customer_counter_goal
-#    - 전방 3cm 접근
-#    - 20cm 후진
-# 7. start_area_sub_goal
-# 8. 종료
 MISSION_SEQUENCE = [
     'storage_shelf_sub_goal',
     'storage_shelf_goal',
@@ -45,7 +26,6 @@ MISSION_SEQUENCE = [
 ]
 
 
-# main goal 도착 후 전방 접근과 후진을 수행할 waypoint
 APPROACH_AND_BACKUP_WAYPOINTS = {
     'storage_shelf_goal',
     'workbench_goal',
@@ -69,31 +49,36 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('waypoints_file', default_yaml)
         self.declare_parameter('frame_id', 'map')
         self.declare_parameter('auto_start', True)
-
-        # waypoint 실패 시 기본적으로 정지
         self.declare_parameter('continue_on_miss', False)
 
-        # Nav2 FollowWaypoints
         self.declare_parameter('follow_waypoints_action_name', 'follow_waypoints')
         self.declare_parameter('follow_waypoints_server_timeout_sec', 10.0)
 
+        # cmd_vel
+        self.declare_parameter('cmd_vel_topic', 'cmd_vel')
+
+        # LaserScan
+        self.declare_parameter('scan_topic', '/scan')
+        self.declare_parameter('front_angle_deg', 10.0)
+        self.declare_parameter('scan_stale_timeout_sec', 0.5)
+
         # 전방 접근
+        # 라이다 기준 전방 장애물과 5cm 간격을 두고 정지
         self.declare_parameter('approach_after_goal', True)
-        self.declare_parameter('approach_target_distance', 0.03)
+        self.declare_parameter('approach_stop_distance', 0.05)
         self.declare_parameter('approach_speed', 0.03)
         self.declare_parameter('approach_timeout_sec', 8.0)
-        self.declare_parameter('approach_front_angle_deg', 10.0)
-        self.declare_parameter('approach_scan_topic', '/scan')
-        self.declare_parameter('approach_cmd_vel_topic', 'cmd_vel')
-        self.declare_parameter('approach_timer_period_sec', 0.05)
+        self.declare_parameter('approach_require_scan', True)
 
         # 후진
+        # cmd_vel로 20cm 후진
         self.declare_parameter('backup_after_goal', True)
         self.declare_parameter('backup_distance', 0.20)
         self.declare_parameter('backup_speed', 0.08)
-        self.declare_parameter('backup_time_allowance_sec', 10)
-        self.declare_parameter('backup_action_name', 'backup')
-        self.declare_parameter('backup_server_timeout_sec', 5.0)
+        self.declare_parameter('backup_timeout_sec', 5.0)
+
+        # timer
+        self.declare_parameter('motion_timer_period_sec', 0.05)
 
         # =========================================================
         # Internal states
@@ -102,11 +87,16 @@ class RobocupWaypointFollower(Node):
         self._current_name: Optional[str] = None
 
         self._nav_goal_handle = None
-        self._backup_goal_handle = None
+
+        self._latest_front_distance: Optional[float] = None
+        self._latest_scan_time = None
 
         self._approach_timer = None
         self._approach_start_time = None
-        self._latest_front_distance: Optional[float] = None
+
+        self._backup_timer = None
+        self._backup_start_time = None
+        self._backup_required_time = 0.0
 
         self._continue_on_miss = bool(
             self.get_parameter('continue_on_miss').value
@@ -116,11 +106,18 @@ class RobocupWaypointFollower(Node):
             self.get_parameter('follow_waypoints_server_timeout_sec').value
         )
 
+        self._front_angle_rad = math.radians(
+            float(self.get_parameter('front_angle_deg').value)
+        )
+        self._scan_stale_timeout_sec = float(
+            self.get_parameter('scan_stale_timeout_sec').value
+        )
+
         self._approach_after_goal = bool(
             self.get_parameter('approach_after_goal').value
         )
-        self._approach_target_distance = float(
-            self.get_parameter('approach_target_distance').value
+        self._approach_stop_distance = float(
+            self.get_parameter('approach_stop_distance').value
         )
         self._approach_speed = float(
             self.get_parameter('approach_speed').value
@@ -128,11 +125,8 @@ class RobocupWaypointFollower(Node):
         self._approach_timeout_sec = float(
             self.get_parameter('approach_timeout_sec').value
         )
-        self._approach_front_angle_rad = math.radians(
-            float(self.get_parameter('approach_front_angle_deg').value)
-        )
-        self._approach_timer_period_sec = float(
-            self.get_parameter('approach_timer_period_sec').value
+        self._approach_require_scan = bool(
+            self.get_parameter('approach_require_scan').value
         )
 
         self._backup_after_goal = bool(
@@ -144,31 +138,23 @@ class RobocupWaypointFollower(Node):
         self._backup_speed = float(
             self.get_parameter('backup_speed').value
         )
-        self._backup_time_allowance_sec = int(
-            self.get_parameter('backup_time_allowance_sec').value
+        self._backup_timeout_sec = float(
+            self.get_parameter('backup_timeout_sec').value
         )
-        self._backup_server_timeout_sec = float(
-            self.get_parameter('backup_server_timeout_sec').value
+
+        self._motion_timer_period_sec = float(
+            self.get_parameter('motion_timer_period_sec').value
         )
 
         # =========================================================
-        # Action clients / publishers / subscribers
+        # ROS interfaces
         # =========================================================
         follow_waypoints_action_name = self.get_parameter(
             'follow_waypoints_action_name'
         ).value
 
-        backup_action_name = self.get_parameter(
-            'backup_action_name'
-        ).value
-
-        scan_topic = self.get_parameter(
-            'approach_scan_topic'
-        ).value
-
-        cmd_vel_topic = self.get_parameter(
-            'approach_cmd_vel_topic'
-        ).value
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        scan_topic = self.get_parameter('scan_topic').value
 
         self._action_client = ActionClient(
             self,
@@ -176,10 +162,10 @@ class RobocupWaypointFollower(Node):
             follow_waypoints_action_name,
         )
 
-        self._backup_client = ActionClient(
-            self,
-            BackUp,
-            backup_action_name,
+        self._cmd_vel_pub = self.create_publisher(
+            Twist,
+            cmd_vel_topic,
+            10,
         )
 
         self._scan_sub = self.create_subscription(
@@ -187,12 +173,6 @@ class RobocupWaypointFollower(Node):
             scan_topic,
             self._scan_callback,
             qos_profile_sensor_data,
-        )
-
-        self._cmd_vel_pub = self.create_publisher(
-            Twist,
-            cmd_vel_topic,
-            10,
         )
 
         # =========================================================
@@ -251,7 +231,6 @@ class RobocupWaypointFollower(Node):
                 'All required mission waypoints loaded.'
             )
 
-        # YAML 안에 sequence가 있어도 사용하지 않는다.
         if isinstance(data, dict) and data.get('sequence'):
             self.get_logger().info(
                 'YAML sequence detected but ignored. '
@@ -395,7 +374,9 @@ class RobocupWaypointFollower(Node):
                 )
 
                 if not self._continue_on_miss:
-                    self.get_logger().warn('Mission stopped due to missed waypoint.')
+                    self.get_logger().warn(
+                        'Mission stopped due to missed waypoint.'
+                    )
                     self._publish_zero_velocity()
                     return
 
@@ -417,20 +398,21 @@ class RobocupWaypointFollower(Node):
         finally:
             self._nav_goal_handle = None
 
-    # =========================================================
-    # Approach
-    # =========================================================
     def _should_approach_and_backup(self, name: Optional[str]) -> bool:
         return (
             name in APPROACH_AND_BACKUP_WAYPOINTS
             and self._approach_after_goal
         )
 
+    # =========================================================
+    # LaserScan
+    # =========================================================
     def _scan_callback(self, msg: LaserScan):
         front_distance = self._get_front_distance(msg)
 
         if front_distance is not None:
             self._latest_front_distance = front_distance
+            self._latest_scan_time = self.get_clock().now()
 
     def _get_front_distance(self, msg: LaserScan) -> Optional[float]:
         if not msg.ranges or msg.angle_increment == 0.0:
@@ -444,7 +426,7 @@ class RobocupWaypointFollower(Node):
 
             angle = msg.angle_min + (index * msg.angle_increment)
 
-            if abs(angle) > self._approach_front_angle_rad:
+            if abs(angle) > self._front_angle_rad:
                 continue
 
             if raw_distance < msg.range_min or raw_distance > msg.range_max:
@@ -457,26 +439,44 @@ class RobocupWaypointFollower(Node):
 
         return min(distances)
 
-    def _start_front_approach(self):
-        distance = self._latest_front_distance
+    def _get_recent_front_distance(self) -> Optional[float]:
+        if self._latest_scan_time is None:
+            return None
 
-        if distance is not None and distance <= self._approach_target_distance:
-            self.get_logger().info(
-                f'Front distance already {distance:.3f} m. '
-                f'Skipping approach after "{self._current_name}".'
-            )
-            self._send_backup_goal()
+        age = (
+            self.get_clock().now() - self._latest_scan_time
+        ).nanoseconds / 1e9
+
+        if age > self._scan_stale_timeout_sec:
+            return None
+
+        return self._latest_front_distance
+
+    # =========================================================
+    # Front approach
+    # =========================================================
+    def _start_front_approach(self):
+        if not self._approach_after_goal:
+            self._start_cmd_vel_backup()
             return
 
-        self._approach_start_time = self.get_clock().now()
+        self._cancel_approach_timer()
+        self._publish_zero_velocity()
+
+        front_distance = self._get_recent_front_distance()
 
         self.get_logger().info(
-            f'Front approach started after "{self._current_name}". '
-            f'Target distance: {self._approach_target_distance:.3f} m'
+            f'Front approach check after "{self._current_name}". '
+            f'Stop distance: {self._approach_stop_distance:.3f} m, '
+            f'Current front distance: {front_distance}'
         )
 
+        # scan이 필수인데 현재 유효 scan이 없으면 바로 전진하지 않는다.
+        # timer에서 scan을 기다리며, timeout되면 후진으로 넘어간다.
+        self._approach_start_time = self.get_clock().now()
+
         self._approach_timer = self.create_timer(
-            self._approach_timer_period_sec,
+            self._motion_timer_period_sec,
             self._approach_timer_callback,
         )
 
@@ -489,126 +489,133 @@ class RobocupWaypointFollower(Node):
             self.get_clock().now() - self._approach_start_time
         ).nanoseconds / 1e9
 
-        distance = self._latest_front_distance
+        front_distance = self._get_recent_front_distance()
 
-        if distance is not None and distance <= self._approach_target_distance:
+        # scan이 없으면 전진 금지
+        if front_distance is None:
+            self._publish_zero_velocity()
+
+            if elapsed >= self._approach_timeout_sec:
+                self.get_logger().warn(
+                    f'Front approach timed out after "{self._current_name}" '
+                    f'because valid scan was not available.'
+                )
+                self._finish_front_approach()
+
+            return
+
+        # 전방 장애물과 목표 거리만큼 가까워졌으면 정지
+        if front_distance <= self._approach_stop_distance:
             self.get_logger().info(
                 f'Front approach complete after "{self._current_name}". '
-                f'Front distance: {distance:.3f} m'
+                f'Front distance: {front_distance:.3f} m'
             )
             self._finish_front_approach()
             return
 
+        # timeout이면 접근 종료 후 후진
         if elapsed >= self._approach_timeout_sec:
-            if distance is None:
-                self.get_logger().warn(
-                    f'Front approach timed out after "{self._current_name}" '
-                    f'without valid scan data.'
-                )
-            else:
-                self.get_logger().warn(
-                    f'Front approach timed out after "{self._current_name}". '
-                    f'Current front distance: {distance:.3f} m'
-                )
-
+            self.get_logger().warn(
+                f'Front approach timed out after "{self._current_name}". '
+                f'Current front distance: {front_distance:.3f} m'
+            )
             self._finish_front_approach()
             return
 
-        if distance is None:
-            self._publish_zero_velocity()
-            return
-
+        # 아직 5cm보다 멀면 천천히 전진
         cmd = Twist()
         cmd.linear.x = abs(self._approach_speed)
         self._cmd_vel_pub.publish(cmd)
 
     def _finish_front_approach(self):
+        self._cancel_approach_timer()
+        self._publish_zero_velocity()
+        self._start_cmd_vel_backup()
+
+    def _cancel_approach_timer(self):
         if self._approach_timer is not None:
             self._approach_timer.cancel()
             self._approach_timer = None
 
         self._approach_start_time = None
-        self._publish_zero_velocity()
-
-        self._send_backup_goal()
 
     # =========================================================
-    # BackUp
+    # cmd_vel backup
     # =========================================================
-    def _send_backup_goal(self):
+    def _start_cmd_vel_backup(self):
         if not self._backup_after_goal:
             self._advance_to_next()
             return
 
-        if self._current_name not in APPROACH_AND_BACKUP_WAYPOINTS:
-            self._advance_to_next()
-            return
+        self._cancel_backup_timer()
+        self._publish_zero_velocity()
 
-        if not self._backup_client.wait_for_server(
-            timeout_sec=self._backup_server_timeout_sec
-        ):
+        if self._backup_distance <= 0.0 or self._backup_speed <= 0.0:
             self.get_logger().warn(
-                'BackUp action server unavailable. '
-                'Continuing to next waypoint.'
+                'Backup skipped because backup distance or speed is invalid.'
             )
             self._advance_to_next()
             return
 
-        goal_msg = BackUp.Goal()
-        goal_msg.target = Point(
-            x=-abs(self._backup_distance),
-            y=0.0,
-            z=0.0,
+        self._backup_required_time = (
+            abs(self._backup_distance) / abs(self._backup_speed)
         )
-        goal_msg.speed = abs(self._backup_speed)
-        goal_msg.time_allowance = Duration(
-            sec=self._backup_time_allowance_sec
-        )
+
+        self._backup_start_time = self.get_clock().now()
 
         self.get_logger().info(
-            f'Backing up {abs(self._backup_distance):.2f} m '
-            f'after "{self._current_name}"'
+            f'Cmd_vel backup started after "{self._current_name}". '
+            f'Distance: {self._backup_distance:.3f} m, '
+            f'Speed: {self._backup_speed:.3f} m/s, '
+            f'Required time: {self._backup_required_time:.2f} sec'
         )
 
-        backup_future = self._backup_client.send_goal_async(goal_msg)
-        backup_future.add_done_callback(self._backup_response_callback)
+        self._backup_timer = self.create_timer(
+            self._motion_timer_period_sec,
+            self._backup_timer_callback,
+        )
 
-    def _backup_response_callback(self, future):
-        try:
-            self._backup_goal_handle = future.result()
-        except Exception as exc:
-            self.get_logger().error(
-                f'Failed to send BackUp goal: {exc}'
-            )
-            self._advance_to_next()
+    def _backup_timer_callback(self):
+        if self._backup_start_time is None:
+            self._finish_cmd_vel_backup()
             return
 
-        if not self._backup_goal_handle.accepted:
-            self.get_logger().warn(
-                'BackUp goal rejected. Continuing to next waypoint.'
-            )
-            self._advance_to_next()
-            return
+        elapsed = (
+            self.get_clock().now() - self._backup_start_time
+        ).nanoseconds / 1e9
 
-        result_future = self._backup_goal_handle.get_result_async()
-        result_future.add_done_callback(self._backup_result_callback)
-
-    def _backup_result_callback(self, future):
-        try:
-            future.result()
-
+        if elapsed >= self._backup_required_time:
             self.get_logger().info(
-                f'BackUp complete after "{self._current_name}"'
+                f'Cmd_vel backup complete after "{self._current_name}". '
+                f'Elapsed: {elapsed:.2f} sec'
             )
+            self._finish_cmd_vel_backup()
+            return
 
-        except Exception as exc:
-            self.get_logger().error(
-                f'Exception in BackUp result callback: {exc}'
+        if elapsed >= self._backup_timeout_sec:
+            self.get_logger().warn(
+                f'Cmd_vel backup timed out after "{self._current_name}". '
+                f'Elapsed: {elapsed:.2f} sec'
             )
+            self._finish_cmd_vel_backup()
+            return
 
-        finally:
-            self._backup_goal_handle = None
-            self._advance_to_next()
+        cmd = Twist()
+        cmd.linear.x = -abs(self._backup_speed)
+        self._cmd_vel_pub.publish(cmd)
+
+    def _finish_cmd_vel_backup(self):
+        self._cancel_backup_timer()
+        self._publish_zero_velocity()
+        self._advance_to_next()
+
+    def _cancel_backup_timer(self):
+        if self._backup_timer is not None:
+            self._backup_timer.cancel()
+            self._backup_timer = None
+
+        self._backup_start_time = None
+        self._backup_required_time = 0.0
 
     # =========================================================
     # Mission control
@@ -627,10 +634,8 @@ class RobocupWaypointFollower(Node):
         self._cmd_vel_pub.publish(Twist())
 
     def destroy_node(self):
-        if self._approach_timer is not None:
-            self._approach_timer.cancel()
-            self._approach_timer = None
-
+        self._cancel_approach_timer()
+        self._cancel_backup_timer()
         self._publish_zero_velocity()
         super().destroy_node()
 
