@@ -105,7 +105,7 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('approach_slowdown_distance', 0.15)
 
         # 정렬 제한 시간
-        self.declare_parameter('approach_timeout_sec', 10.0)
+        self.declare_parameter('approach_timeout_sec', 12.0)
 
         # =========================================================
         # Backup
