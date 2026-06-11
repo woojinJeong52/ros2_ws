@@ -2,11 +2,11 @@
   ros__parameters:
     flip1: false
     flip2: false
-    inverse1: false
-    inverse2: false
+    inverse1: true
+    inverse2: true
     laser1Alpha: 0.0
-    laser1AngleMin: 265.0
-    laser1AngleMax: -265.0
+    laser1AngleMin: -85.0
+    laser1AngleMax: 85.0
     laser1B: 0
     laser1G: 0
     laser1R: 255
@@ -14,8 +14,8 @@
     laser1YOff:  0.0     # URDF: lidar1_link y=0.0
     laser1ZOff:  0.04    # URDF: lidar1_link z=0.04
     laser2Alpha: 180.0
-    laser2AngleMin: 265.0
-    laser2AngleMax: -265.0
+    laser2AngleMin: -85.0
+    laser2AngleMax: 85.0
     laser2B: 255
     laser2G: 0
     laser2R: 0
