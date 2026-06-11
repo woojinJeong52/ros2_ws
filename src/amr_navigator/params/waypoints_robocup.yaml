@@ -34,11 +34,11 @@ waypoints:
     orientation: {x: 0.0, y: 0.0, z: 0.008077516164110841, w: 0.9999673763341574}
 
 sequence:
-  - start_area_goal
-  - start_area_sub_goal
-  - storage_shelf_goal
   - storage_shelf_sub_goal
-  - workbench_goal
+  - storage_shelf_goal
   - workbench_sub_goal
-  - customer_counter_goal
+  - workbench_goal
   - customer_counter_sub_goal
+  - customer_counter_goal
+  - start_area_sub_goal
+  - start_area_goal
