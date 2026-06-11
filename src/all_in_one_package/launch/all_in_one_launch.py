@@ -51,7 +51,7 @@ def generate_launch_description():
                             'localization_launch.py'
                         )
                     ),
-                    launch_arguments={'map': os.path.expandvars('$HOME/ros2_ws/src/amr/map/final_demo_4.yaml')}.items(),
+                    launch_arguments={'map': os.path.expandvars('$HOME/ros2_ws/src/amr/map/0611demo.yaml')}.items(),
                 ),
             ]
         ),
