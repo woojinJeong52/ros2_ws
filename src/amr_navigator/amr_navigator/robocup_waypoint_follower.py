@@ -120,7 +120,7 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # 20cm 후진 후 반시계방향 120도 회전
         self.declare_parameter('rotate_after_backup', True)
-        self.declare_parameter('rotate_angle_deg', 130.0)
+        self.declare_parameter('rotate_angle_deg', 150.0)
 
         # rad/s, 양수 방향이 반시계방향
         self.declare_parameter('rotate_angular_speed', 0.5)
