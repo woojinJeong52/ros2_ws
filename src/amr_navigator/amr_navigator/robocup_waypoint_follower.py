@@ -29,8 +29,8 @@ MISSION_SEQUENCE = [
 ]
 
 
-# main goal 도착 후 전방 정렬 + 후진을 수행할 waypoint
-APPROACH_AND_BACKUP_WAYPOINTS = {
+# main goal 도착 후 전방 정렬 + 후진 + 회전을 수행할 waypoint
+APPROACH_BACKUP_ROTATE_WAYPOINTS = {
     'storage_shelf_goal',
     'workbench_goal',
     'customer_counter_goal',
@@ -73,7 +73,6 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('front_edge_sample_count', 5)
 
         # 배열 맨 앞/맨 뒤에서 몇 개를 건너뛸지.
-        # 보통 0이면 됨.
         self.declare_parameter('front_edge_skip_count', 0)
 
         # scan이 이 시간보다 오래되면 정렬 중 전진/후진 금지
@@ -90,11 +89,11 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # Front distance alignment
         # =========================================================
-        # /scan 전방 edge 데이터 기준 45cm 거리로 정렬
+        # /scan 전방 edge 데이터 기준 47cm 거리로 정렬
         self.declare_parameter('approach_after_goal', True)
         self.declare_parameter('target_front_distance', 0.47)
 
-        # 허용 오차: 45cm ± 2cm 안에 들어오면 정렬 완료
+        # 허용 오차: 47cm ± 1cm 안에 들어오면 정렬 완료
         self.declare_parameter('target_distance_tolerance', 0.01)
 
         # 정렬 속도
@@ -116,6 +115,17 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('backup_speed', 0.08)
         self.declare_parameter('backup_timeout_sec', 5.0)
 
+        # =========================================================
+        # Rotation after backup
+        # =========================================================
+        # 20cm 후진 후 반시계방향 120도 회전
+        self.declare_parameter('rotate_after_backup', True)
+        self.declare_parameter('rotate_angle_deg', 120.0)
+
+        # rad/s, 양수 방향이 반시계방향
+        self.declare_parameter('rotate_angular_speed', 0.5)
+        self.declare_parameter('rotate_timeout_sec', 8.0)
+
         # timer
         self.declare_parameter('motion_timer_period_sec', 0.05)
 
@@ -126,7 +136,7 @@ class RobocupWaypointFollower(Node):
         self._current_name: Optional[str] = None
 
         # phase:
-        # IDLE -> NAVIGATING -> APPROACHING -> BACKING_UP -> IDLE
+        # IDLE -> NAVIGATING -> APPROACHING -> BACKING_UP -> ROTATING -> IDLE
         # DONE / ERROR
         self._phase = 'IDLE'
         self._mission_done = False
@@ -140,12 +150,20 @@ class RobocupWaypointFollower(Node):
         self._latest_scan_range_max: Optional[float] = None
         self._last_scan_debug_time = None
 
+        self._last_front_candidates = []
+        self._last_front_valid_distances = []
+        self._last_front_median: Optional[float] = None
+
         self._approach_timer = None
         self._approach_start_time = None
 
         self._backup_timer = None
         self._backup_start_time = None
         self._backup_required_time = 0.0
+
+        self._rotate_timer = None
+        self._rotate_start_time = None
+        self._rotate_required_time = 0.0
 
         self._continue_on_miss = bool(
             self.get_parameter('continue_on_miss').value
@@ -227,6 +245,24 @@ class RobocupWaypointFollower(Node):
             self.get_parameter('backup_timeout_sec').value
         )
 
+        self._rotate_after_backup = bool(
+            self.get_parameter('rotate_after_backup').value
+        )
+
+        self._rotate_angle_deg = float(
+            self.get_parameter('rotate_angle_deg').value
+        )
+
+        self._rotate_angle_rad = math.radians(self._rotate_angle_deg)
+
+        self._rotate_angular_speed = float(
+            self.get_parameter('rotate_angular_speed').value
+        )
+
+        self._rotate_timeout_sec = float(
+            self.get_parameter('rotate_timeout_sec').value
+        )
+
         self._motion_timer_period_sec = float(
             self.get_parameter('motion_timer_period_sec').value
         )
@@ -274,7 +310,11 @@ class RobocupWaypointFollower(Node):
             f'front_edge_sample_count: {self._front_edge_sample_count}, '
             f'front_edge_skip_count: {self._front_edge_skip_count}, '
             f'target_front_distance: {self._target_front_distance:.3f} m, '
-            f'tolerance: ±{self._target_distance_tolerance:.3f} m'
+            f'tolerance: ±{self._target_distance_tolerance:.3f} m, '
+            f'backup_distance: {self._backup_distance:.3f} m, '
+            f'rotate_after_backup: {self._rotate_after_backup}, '
+            f'rotate_angle: {self._rotate_angle_deg:.1f} deg, '
+            f'rotate_speed: {self._rotate_angular_speed:.3f} rad/s'
         )
 
         if self.get_parameter('auto_start').value:
@@ -515,10 +555,11 @@ class RobocupWaypointFollower(Node):
 
     def _should_post_process(self, name: Optional[str]) -> bool:
         return (
-            name in APPROACH_AND_BACKUP_WAYPOINTS
+            name in APPROACH_BACKUP_ROTATE_WAYPOINTS
             and (
                 self._approach_after_goal
                 or self._backup_after_goal
+                or self._rotate_after_backup
             )
         )
 
@@ -553,18 +594,33 @@ class RobocupWaypointFollower(Node):
 
         self._last_scan_debug_time = now
 
+        candidates_str = [
+            round(v, 3) if math.isfinite(v) else 'inf'
+            for v in self._last_front_candidates
+        ]
+
+        valid_str = [
+            round(v, 3)
+            for v in self._last_front_valid_distances
+        ]
+
         self.get_logger().info(
-            f'[SCAN DEBUG] frame={msg.header.frame_id}, '
+            f'[SCAN MEDIAN DEBUG] '
+            f'frame={msg.header.frame_id}, '
             f'ranges_len={len(msg.ranges)}, '
             f'edge_sample_count={self._front_edge_sample_count}, '
             f'edge_skip_count={self._front_edge_skip_count}, '
-            f'custom_min={self._front_min_valid_range:.3f}, '
-            f'custom_max={self._front_max_valid_range:.3f}, '
+            f'front_candidates={candidates_str}, '
+            f'valid_sorted={valid_str}, '
+            f'median={self._last_front_median}, '
             f'front_distance={front_distance}'
         )
 
     def _get_front_distance(self, msg: LaserScan) -> Optional[float]:
         if not msg.ranges:
+            self._last_front_candidates = []
+            self._last_front_valid_distances = []
+            self._last_front_median = None
             return None
 
         ranges = list(msg.ranges)
@@ -576,6 +632,9 @@ class RobocupWaypointFollower(Node):
         required_count = (sample_count + skip_count) * 2
 
         if total_count < required_count:
+            self._last_front_candidates = []
+            self._last_front_valid_distances = []
+            self._last_front_median = None
             return None
 
         front_candidates = []
@@ -609,7 +668,11 @@ class RobocupWaypointFollower(Node):
 
             valid_distances.append(raw_distance)
 
+        self._last_front_candidates = front_candidates
+        self._last_front_valid_distances = list(valid_distances)
+
         if not valid_distances:
+            self._last_front_median = None
             return None
 
         valid_distances.sort()
@@ -617,11 +680,16 @@ class RobocupWaypointFollower(Node):
 
         # median 사용
         if len(valid_distances) % 2 == 1:
-            return valid_distances[mid]
+            median_distance = valid_distances[mid]
+        else:
+            median_distance = 0.5 * (
+                valid_distances[mid - 1] + valid_distances[mid]
+            )
 
-        return 0.5 * (
-            valid_distances[mid - 1] + valid_distances[mid]
-        )
+        self._last_front_valid_distances = valid_distances
+        self._last_front_median = median_distance
+
+        return median_distance
 
     def _get_recent_front_distance(self) -> Optional[float]:
         if self._latest_scan_time is None:
@@ -789,7 +857,7 @@ class RobocupWaypointFollower(Node):
     # =========================================================
     def _start_cmd_vel_backup(self):
         if not self._backup_after_goal:
-            self._advance_to_next()
+            self._start_cmd_vel_rotation()
             return
 
         if self._phase not in ['APPROACHING', 'NAVIGATING']:
@@ -805,7 +873,7 @@ class RobocupWaypointFollower(Node):
             self.get_logger().warn(
                 'Backup skipped because backup distance or speed is invalid.'
             )
-            self._advance_to_next()
+            self._start_cmd_vel_rotation()
             return
 
         self._phase = 'BACKING_UP'
@@ -882,7 +950,7 @@ class RobocupWaypointFollower(Node):
             f'name="{self._current_name}"'
         )
 
-        self._advance_to_next()
+        self._start_cmd_vel_rotation()
 
     def _cancel_backup_timer(self):
         if self._backup_timer is not None:
@@ -891,6 +959,118 @@ class RobocupWaypointFollower(Node):
 
         self._backup_start_time = None
         self._backup_required_time = 0.0
+
+    # =========================================================
+    # cmd_vel rotation
+    # =========================================================
+    def _start_cmd_vel_rotation(self):
+        if not self._rotate_after_backup:
+            self._advance_to_next()
+            return
+
+        if self._phase not in ['BACKING_UP', 'APPROACHING', 'NAVIGATING']:
+            self.get_logger().warn(
+                f'Rotation start ignored because phase is {self._phase}.'
+            )
+            return
+
+        self._cancel_rotate_timer()
+        self._publish_zero_velocity()
+
+        if self._rotate_angle_rad <= 0.0 or self._rotate_angular_speed <= 0.0:
+            self.get_logger().warn(
+                'Rotation skipped because rotate angle or angular speed is invalid.'
+            )
+            self._advance_to_next()
+            return
+
+        self._phase = 'ROTATING'
+
+        self._rotate_required_time = (
+            abs(self._rotate_angle_rad) / abs(self._rotate_angular_speed)
+        )
+
+        self._rotate_start_time = self.get_clock().now()
+
+        self.get_logger().info(
+            f'[ROTATE START] index={self._current_index}, '
+            f'name="{self._current_name}", '
+            f'angle={self._rotate_angle_deg:.1f} deg, '
+            f'angular_speed={self._rotate_angular_speed:.3f} rad/s, '
+            f'direction=CCW, '
+            f'required_time={self._rotate_required_time:.2f} sec'
+        )
+
+        self._rotate_timer = self.create_timer(
+            self._motion_timer_period_sec,
+            self._rotate_timer_callback,
+        )
+
+    def _rotate_timer_callback(self):
+        if self._phase != 'ROTATING':
+            self.get_logger().warn(
+                f'Rotate timer ignored because phase is {self._phase}.'
+            )
+            self._cancel_rotate_timer()
+            return
+
+        if self._rotate_start_time is None:
+            self._finish_cmd_vel_rotation()
+            return
+
+        elapsed = (
+            self.get_clock().now() - self._rotate_start_time
+        ).nanoseconds / 1e9
+
+        if elapsed >= self._rotate_required_time:
+            self.get_logger().info(
+                f'[ROTATE DONE] index={self._current_index}, '
+                f'name="{self._current_name}", '
+                f'elapsed={elapsed:.2f} sec'
+            )
+            self._finish_cmd_vel_rotation()
+            return
+
+        if elapsed >= self._rotate_timeout_sec:
+            self.get_logger().warn(
+                f'[ROTATE TIMEOUT] index={self._current_index}, '
+                f'name="{self._current_name}", '
+                f'elapsed={elapsed:.2f} sec'
+            )
+            self._finish_cmd_vel_rotation()
+            return
+
+        cmd = Twist()
+
+        # ROS 기준 angular.z 양수 = 반시계방향 회전
+        cmd.angular.z = abs(self._rotate_angular_speed)
+
+        self._cmd_vel_pub.publish(cmd)
+
+    def _finish_cmd_vel_rotation(self):
+        if self._phase != 'ROTATING':
+            self.get_logger().warn(
+                f'Finish rotation ignored because phase is {self._phase}.'
+            )
+            return
+
+        self._cancel_rotate_timer()
+        self._publish_zero_velocity()
+
+        self.get_logger().info(
+            f'[ROTATE FINISH] index={self._current_index}, '
+            f'name="{self._current_name}"'
+        )
+
+        self._advance_to_next()
+
+    def _cancel_rotate_timer(self):
+        if self._rotate_timer is not None:
+            self._rotate_timer.cancel()
+            self._rotate_timer = None
+
+        self._rotate_start_time = None
+        self._rotate_required_time = 0.0
 
     # =========================================================
     # Mission control
@@ -923,6 +1103,7 @@ class RobocupWaypointFollower(Node):
 
         self._cancel_approach_timer()
         self._cancel_backup_timer()
+        self._cancel_rotate_timer()
         self._publish_zero_velocity()
 
         self.get_logger().info(
@@ -936,6 +1117,7 @@ class RobocupWaypointFollower(Node):
     def destroy_node(self):
         self._cancel_approach_timer()
         self._cancel_backup_timer()
+        self._cancel_rotate_timer()
         self._publish_zero_velocity()
         super().destroy_node()
 
