@@ -84,7 +84,7 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('front_max_valid_range', 5.0)
 
         # 디버그 로그
-        self.declare_parameter('scan_debug', False)
+        self.declare_parameter('scan_debug', True)
         self.declare_parameter('scan_debug_period_sec', 1.0)
 
         # =========================================================
