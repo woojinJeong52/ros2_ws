@@ -95,14 +95,14 @@ class RobocupWaypointFollower(Node):
         self.declare_parameter('target_front_distance', 0.47)
 
         # 허용 오차: 45cm ± 2cm 안에 들어오면 정렬 완료
-        self.declare_parameter('target_distance_tolerance', 0.02)
+        self.declare_parameter('target_distance_tolerance', 0.01)
 
         # 정렬 속도
-        self.declare_parameter('approach_speed', 0.05)
-        self.declare_parameter('approach_min_speed', 0.03)
+        self.declare_parameter('approach_speed', 0.08)
+        self.declare_parameter('approach_min_speed', 0.05)
 
         # 목표 거리 근처에서 감속 시작할 범위
-        self.declare_parameter('approach_slowdown_distance', 0.20)
+        self.declare_parameter('approach_slowdown_distance', 0.15)
 
         # 정렬 제한 시간
         self.declare_parameter('approach_timeout_sec', 10.0)
