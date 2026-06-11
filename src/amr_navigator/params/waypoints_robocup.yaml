@@ -1,0 +1,43 @@
+frame_id: map
+waypoints:
+  start_area_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  start_area_sub_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  storage_shelf_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  storage_shelf_sub_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  workbench_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  workbench_sub_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  customer_counter_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+  customer_counter_sub_goal:
+    position: {x: null, y: null, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: null, w: null}
+
+sequence:
+  - storage_shelf_sub_goal
+  - storage_shelf_goal
+  - workbench_sub_goal
+  - workbench_goal
+  - customer_counter_sub_goal
+  - customer_counter_goal
+  - start_area_sub_goal
+  - start_area_goal
