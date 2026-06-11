@@ -65,15 +65,13 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # Front LiDAR
         # =========================================================
-        # 중요:
-        # /scan은 전방/후방 라이다가 섞일 수 있으므로,
         # 전방 라이다 원본 토픽을 직접 사용한다.
         self.declare_parameter('scan_topic', '/rplidar1/scan')
         self.declare_parameter('front_lidar_frame_id', 'lidar1_link')
 
         # 라이다 angle 0도 기준으로 전방을 본다.
-        # 만약 전방 감지가 반대로 잡히면 180.0으로 바꿔서 테스트.
-        self.declare_parameter('front_angle_center_deg', 180.0)
+        # 만약 전방 감지가 반대로 잡히면 180.0으로 변경.
+        self.declare_parameter('front_angle_center_deg', 0.0)
 
         # 전방 중심 기준 ±10도만 사용
         self.declare_parameter('front_angle_deg', 10.0)
@@ -81,10 +79,20 @@ class RobocupWaypointFollower(Node):
         # scan이 이 시간보다 오래되면 전진 금지
         self.declare_parameter('scan_stale_timeout_sec', 0.5)
 
+        # 원본 ranges[] 값을 직접 사용하기 위한 코드 내부 유효 거리 기준
+        # 중요:
+        # msg.range_min이 0.15여도, 실제 ranges[]에 0.03~0.05 값이 있으면 사용한다.
+        self.declare_parameter('front_min_valid_range', 0.005)
+        self.declare_parameter('front_max_valid_range', 3.0)
+
+        # 디버그 로그
+        self.declare_parameter('scan_debug', False)
+        self.declare_parameter('scan_debug_period_sec', 1.0)
+
         # =========================================================
         # Front approach
         # =========================================================
-        # 전방 라이다 기준 장애물과 5cm 간격을 두고 정지
+        # 전방 라이다 원본 데이터 기준 장애물과 5cm 간격을 두고 정지
         self.declare_parameter('approach_after_goal', True)
         self.declare_parameter('approach_stop_distance', 0.05)
 
@@ -128,6 +136,7 @@ class RobocupWaypointFollower(Node):
         self._latest_scan_time = None
         self._latest_scan_range_min: Optional[float] = None
         self._latest_scan_range_max: Optional[float] = None
+        self._last_scan_debug_time = None
 
         self._approach_timer = None
         self._approach_start_time = None
@@ -158,6 +167,22 @@ class RobocupWaypointFollower(Node):
 
         self._scan_stale_timeout_sec = float(
             self.get_parameter('scan_stale_timeout_sec').value
+        )
+
+        self._front_min_valid_range = float(
+            self.get_parameter('front_min_valid_range').value
+        )
+
+        self._front_max_valid_range = float(
+            self.get_parameter('front_max_valid_range').value
+        )
+
+        self._scan_debug = bool(
+            self.get_parameter('scan_debug').value
+        )
+
+        self._scan_debug_period_sec = float(
+            self.get_parameter('scan_debug_period_sec').value
         )
 
         self._approach_after_goal = bool(
@@ -245,7 +270,9 @@ class RobocupWaypointFollower(Node):
         self.get_logger().info(
             f'Front LiDAR topic: {scan_topic}, '
             f'expected frame_id: {self._front_lidar_frame_id}, '
-            f'approach_stop_distance: {self._approach_stop_distance:.3f} m'
+            f'approach_stop_distance: {self._approach_stop_distance:.3f} m, '
+            f'raw_range_filter=[{self._front_min_valid_range:.3f}, '
+            f'{self._front_max_valid_range:.3f}] m'
         )
 
         if self.get_parameter('auto_start').value:
@@ -503,15 +530,55 @@ class RobocupWaypointFollower(Node):
             expected_frame = self._front_lidar_frame_id.lstrip('/')
 
             if msg_frame != expected_frame:
+                self._scan_debug_log(
+                    msg,
+                    None,
+                    extra=f'frame mismatch: got={msg_frame}, expected={expected_frame}',
+                )
                 return
 
         front_distance = self._get_front_distance(msg)
+
+        self._scan_debug_log(msg, front_distance)
 
         if front_distance is not None:
             self._latest_front_distance = front_distance
             self._latest_scan_time = self.get_clock().now()
             self._latest_scan_range_min = msg.range_min
             self._latest_scan_range_max = msg.range_max
+
+    def _scan_debug_log(
+        self,
+        msg: LaserScan,
+        front_distance: Optional[float],
+        extra: str = '',
+    ):
+        if not self._scan_debug:
+            return
+
+        now = self.get_clock().now()
+
+        if self._last_scan_debug_time is not None:
+            elapsed = (
+                now - self._last_scan_debug_time
+            ).nanoseconds / 1e9
+
+            if elapsed < self._scan_debug_period_sec:
+                return
+
+        self._last_scan_debug_time = now
+
+        self.get_logger().info(
+            f'[SCAN DEBUG] frame={msg.header.frame_id}, '
+            f'msg_range_min={msg.range_min:.3f}, '
+            f'msg_range_max={msg.range_max:.3f}, '
+            f'custom_min={self._front_min_valid_range:.3f}, '
+            f'custom_max={self._front_max_valid_range:.3f}, '
+            f'angle_center={math.degrees(self._front_angle_center_rad):.1f} deg, '
+            f'angle_width={math.degrees(self._front_angle_rad):.1f} deg, '
+            f'front_distance={front_distance}, '
+            f'{extra}'
+        )
 
     def _get_front_distance(self, msg: LaserScan) -> Optional[float]:
         if not msg.ranges or msg.angle_increment == 0.0:
@@ -520,6 +587,8 @@ class RobocupWaypointFollower(Node):
         distances = []
 
         for index, raw_distance in enumerate(msg.ranges):
+            # 원본 ranges[] 값 사용
+            # inf, nan만 제거
             if not math.isfinite(raw_distance):
                 continue
 
@@ -531,10 +600,17 @@ class RobocupWaypointFollower(Node):
                 math.cos(angle - self._front_angle_center_rad),
             )
 
+            # 전방 ±front_angle_deg 범위만 사용
             if abs(angle_error) > self._front_angle_rad:
                 continue
 
-            if raw_distance < msg.range_min or raw_distance > msg.range_max:
+            # 중요:
+            # msg.range_min을 쓰지 않는다.
+            # 원본 ranges[]에 가까운 값이 존재하면 그대로 사용한다.
+            if raw_distance < self._front_min_valid_range:
+                continue
+
+            if raw_distance > self._front_max_valid_range:
                 continue
 
             distances.append(raw_distance)
@@ -542,7 +618,7 @@ class RobocupWaypointFollower(Node):
         if not distances:
             return None
 
-        # 전방 ±front_angle_deg 범위에서 가장 가까운 장애물 거리
+        # 전방 ±front_angle_deg 범위 안에서 가장 가까운 장애물 거리
         return min(distances)
 
     def _get_recent_front_distance(self) -> Optional[float]:
@@ -592,9 +668,10 @@ class RobocupWaypointFollower(Node):
             and self._approach_stop_distance < self._latest_scan_range_min
         ):
             self.get_logger().warn(
-                f'approach_stop_distance={self._approach_stop_distance:.3f} m '
-                f'is smaller than scan range_min={self._latest_scan_range_min:.3f} m. '
-                f'LiDAR may not reliably measure the requested stop distance.'
+                f'LaserScan msg.range_min={self._latest_scan_range_min:.3f} m, '
+                f'but this node uses raw ranges[] with '
+                f'front_min_valid_range={self._front_min_valid_range:.3f} m. '
+                f'Close-range raw values will be accepted.'
             )
 
         self._approach_start_time = self.get_clock().now()
@@ -636,12 +713,13 @@ class RobocupWaypointFollower(Node):
 
             return
 
-        # 전방 라이다 기준 장애물과 5cm 이하가 되면 정지
+        # 전방 라이다 원본 데이터 기준 장애물과 5cm 이하가 되면 정지
         if front_distance <= self._approach_stop_distance:
             self.get_logger().info(
                 f'[APPROACH DONE] index={self._current_index}, '
                 f'name="{self._current_name}", '
-                f'front_distance={front_distance:.3f} m'
+                f'front_distance={front_distance:.3f} m, '
+                f'stop_distance={self._approach_stop_distance:.3f} m'
             )
             self._finish_front_approach()
             return
@@ -674,7 +752,10 @@ class RobocupWaypointFollower(Node):
         ratio = (front_distance - stop) / (slowdown - stop)
         speed = abs(self._approach_speed) * ratio
 
-        return max(abs(self._approach_min_speed), min(speed, abs(self._approach_speed)))
+        return max(
+            abs(self._approach_min_speed),
+            min(speed, abs(self._approach_speed)),
+        )
 
     def _finish_front_approach(self):
         if self._phase != 'APPROACHING':
