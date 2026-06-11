@@ -89,8 +89,8 @@ def generate_launch_description():
                     'name': 'angle1',
                     'type': 'laser_filters/LaserScanAngularBoundsFilterInPlace',
                     'params': {
-                        'lower_angle': -1.4835,
-                        'upper_angle': 1.4835
+                        'lower_angle': 1.4835,
+                        'upper_angle': -1.4835
                     }
                 }
             }],
@@ -157,8 +157,8 @@ def generate_launch_description():
                     'name': 'angle1',
                     'type': 'laser_filters/LaserScanAngularBoundsFilterInPlace',
                     'params': {
-                        'lower_angle': -1.4835,
-                        'upper_angle': 1.4835
+                        'lower_angle': 1.4835,
+                        'upper_angle': -1.4835
                     }
                 }
             }],
