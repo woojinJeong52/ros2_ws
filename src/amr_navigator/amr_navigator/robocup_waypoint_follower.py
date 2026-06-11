@@ -68,13 +68,13 @@ class RobocupWaypointFollower(Node):
         # 병합된 /scan 데이터를 사용한다.
         self.declare_parameter('scan_topic', '/scan')
 
-        # /scan 기준 전방 방향.
-        # 일반적으로 angle 0도가 전방이다.
-        # 만약 전방 감지가 반대로 잡히면 180.0으로 변경.
-        self.declare_parameter('front_angle_center_deg', 0.0)
+        # /scan 배열의 처음 N개 + 끝 N개를 전방 데이터로 사용한다.
+        # 현재 /scan 구조에서는 전방이 배열 양끝에 걸쳐 있음.
+        self.declare_parameter('front_edge_sample_count', 5)
 
-        # 전방 중심 기준 ±15도 범위 사용
-        self.declare_parameter('front_angle_deg', 15.0)
+        # 배열 맨 앞/맨 뒤에서 몇 개를 건너뛸지.
+        # 보통 0이면 됨.
+        self.declare_parameter('front_edge_skip_count', 0)
 
         # scan이 이 시간보다 오래되면 정렬 중 전진/후진 금지
         self.declare_parameter('scan_stale_timeout_sec', 0.5)
@@ -90,7 +90,7 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # Front distance alignment
         # =========================================================
-        # /scan 전방 장애물 기준 45cm 거리로 정렬
+        # /scan 전방 edge 데이터 기준 45cm 거리로 정렬
         self.declare_parameter('approach_after_goal', True)
         self.declare_parameter('target_front_distance', 0.45)
 
@@ -155,12 +155,12 @@ class RobocupWaypointFollower(Node):
             self.get_parameter('follow_waypoints_server_timeout_sec').value
         )
 
-        self._front_angle_center_rad = math.radians(
-            float(self.get_parameter('front_angle_center_deg').value)
+        self._front_edge_sample_count = int(
+            self.get_parameter('front_edge_sample_count').value
         )
 
-        self._front_angle_rad = math.radians(
-            float(self.get_parameter('front_angle_deg').value)
+        self._front_edge_skip_count = int(
+            self.get_parameter('front_edge_skip_count').value
         )
 
         self._scan_stale_timeout_sec = float(
@@ -271,10 +271,10 @@ class RobocupWaypointFollower(Node):
 
         self.get_logger().info(
             f'Merged scan topic: {scan_topic}, '
+            f'front_edge_sample_count: {self._front_edge_sample_count}, '
+            f'front_edge_skip_count: {self._front_edge_skip_count}, '
             f'target_front_distance: {self._target_front_distance:.3f} m, '
-            f'tolerance: ±{self._target_distance_tolerance:.3f} m, '
-            f'front_angle_center: {math.degrees(self._front_angle_center_rad):.1f} deg, '
-            f'front_angle_width: ±{math.degrees(self._front_angle_rad):.1f} deg'
+            f'tolerance: ±{self._target_distance_tolerance:.3f} m'
         )
 
         if self.get_parameter('auto_start').value:
@@ -555,48 +555,73 @@ class RobocupWaypointFollower(Node):
 
         self.get_logger().info(
             f'[SCAN DEBUG] frame={msg.header.frame_id}, '
-            f'msg_range_min={msg.range_min:.3f}, '
-            f'msg_range_max={msg.range_max:.3f}, '
+            f'ranges_len={len(msg.ranges)}, '
+            f'edge_sample_count={self._front_edge_sample_count}, '
+            f'edge_skip_count={self._front_edge_skip_count}, '
             f'custom_min={self._front_min_valid_range:.3f}, '
             f'custom_max={self._front_max_valid_range:.3f}, '
-            f'angle_center={math.degrees(self._front_angle_center_rad):.1f} deg, '
-            f'angle_width=±{math.degrees(self._front_angle_rad):.1f} deg, '
             f'front_distance={front_distance}'
         )
 
     def _get_front_distance(self, msg: LaserScan) -> Optional[float]:
-        if not msg.ranges or msg.angle_increment == 0.0:
+        if not msg.ranges:
             return None
 
-        distances = []
+        ranges = list(msg.ranges)
+        total_count = len(ranges)
 
-        for index, raw_distance in enumerate(msg.ranges):
+        sample_count = max(1, self._front_edge_sample_count)
+        skip_count = max(0, self._front_edge_skip_count)
+
+        required_count = (sample_count + skip_count) * 2
+
+        if total_count < required_count:
+            return None
+
+        front_candidates = []
+
+        # 배열 시작부 N개
+        front_candidates.extend(
+            ranges[skip_count: skip_count + sample_count]
+        )
+
+        # 배열 끝부분 N개
+        if skip_count == 0:
+            front_candidates.extend(
+                ranges[-sample_count:]
+            )
+        else:
+            front_candidates.extend(
+                ranges[-skip_count - sample_count: -skip_count]
+            )
+
+        valid_distances = []
+
+        for raw_distance in front_candidates:
             if not math.isfinite(raw_distance):
                 continue
 
-            angle = msg.angle_min + (index * msg.angle_increment)
-
-            angle_error = math.atan2(
-                math.sin(angle - self._front_angle_center_rad),
-                math.cos(angle - self._front_angle_center_rad),
-            )
-
-            if abs(angle_error) > self._front_angle_rad:
-                continue
-
-            # msg.range_min 대신 코드 내부 유효 범위를 사용한다.
             if raw_distance < self._front_min_valid_range:
                 continue
 
             if raw_distance > self._front_max_valid_range:
                 continue
 
-            distances.append(raw_distance)
+            valid_distances.append(raw_distance)
 
-        if not distances:
+        if not valid_distances:
             return None
 
-        return min(distances)
+        valid_distances.sort()
+        mid = len(valid_distances) // 2
+
+        # median 사용
+        if len(valid_distances) % 2 == 1:
+            return valid_distances[mid]
+
+        return 0.5 * (
+            valid_distances[mid - 1] + valid_distances[mid]
+        )
 
     def _get_recent_front_distance(self) -> Optional[float]:
         if self._latest_scan_time is None:
