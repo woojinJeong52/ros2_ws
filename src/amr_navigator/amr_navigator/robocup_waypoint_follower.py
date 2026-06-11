@@ -86,7 +86,7 @@ class RobocupWaypointFollower(Node):
         # =========================================================
         # 전방 라이다 기준 장애물과 5cm 간격을 두고 정지
         self.declare_parameter('approach_after_goal', True)
-        self.declare_parameter('approach_stop_distance', 0.15)
+        self.declare_parameter('approach_stop_distance', 0.20)
 
         # 기본 접근 속도
         self.declare_parameter('approach_speed', 0.03)
