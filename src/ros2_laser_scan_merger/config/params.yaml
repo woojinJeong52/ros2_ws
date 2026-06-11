@@ -4,83 +4,56 @@
     flip2: false
     inverse1: false
     inverse2: false
-
-    # =========================================================
-    # Front LiDAR
-    # =========================================================
     laser1Alpha: 0.0
-
-    # FOV: left 85 deg + right 85 deg = total 170 deg
     laser1AngleMin: -85.0
     laser1AngleMax: 85.0
-
     laser1B: 0
     laser1G: 0
     laser1R: 255
-
-    # URDF: lidar1_link x = +0.345
-    laser1XOff: 0.345
-    laser1YOff: 0.0
-    laser1ZOff: 0.04
-
-    # =========================================================
-    # Rear LiDAR
-    # =========================================================
+    laser1XOff:  -0.345   # URDF: lidar1_link x=0.345
+    laser1YOff:  0.0     # URDF: lidar1_link y=0.0
+    laser1ZOff:  0.04    # URDF: lidar1_link z=0.04
     laser2Alpha: 180.0
-
-    # FOV: left 85 deg + right 85 deg = total 170 deg
     laser2AngleMin: -85.0
     laser2AngleMax: 85.0
-
     laser2B: 255
     laser2G: 0
     laser2R: 0
-
-    # URDF: lidar2_link x = -0.345
-    laser2XOff: -0.345
-    laser2YOff: 0.0
-    laser2ZOff: 0.04
-
+    laser2XOff: 0.345   # URDF: lidar2_link x=-0.345
+    laser2YOff:  0.0     # URDF: lidar2_link y=0.0
+    laser2ZOff:  0.04    # URDF: lidar2_link z=0.04
     pointCloudTopic: cloud_in
     pointCloutFrameId: laser
-
     qos_overrides./parameter_events.publisher.depth: 1000
+    # qos_overrides./parameter_events.publisher.durability: volatile
+    # qos_overrides./parameter_events.publisher.history: keep_last
     qos_overrides./parameter_events.publisher.reliability: best_effort
-
     scanTopic1: /rplidar1/scan
     scanTopic2: /rplidar2/scan
-
     show1: true
     show2: true
     use_sim_time: false
 
-
 /pointcloud_to_laserscan:
   ros__parameters:
-    angle_increment: 0.01256637  # 0.72 deg
-
-    # 최종 /scan은 전체 -180 ~ +180 deg로 유지
-    # 그래야 네 waypoint follower에서 ranges[] 앞부분 + 끝부분을 전방 edge로 쓸 수 있음.
-    angle_min: -3.14
+    angle_increment: 0.01256637 # 각도 분해능 0.72도 0.72 x (pi/180)
+    # angle_max: 1.5708
+    # angle_min: -1.5708
     angle_max: 3.14
-
+    angle_min: -3.14
     inf_epsilon: 1.0
     max_height: 1.0
     min_height: 0.0
-
     qos_overrides:
       /parameter_events:
         publisher:
           depth: 1000
+          # durability: volatile
+          # history: keep_last
           reliability: best_effort
-
     queue_size: 16
     range_max: 10.0
-
-    # 현재 target_front_distance가 0.47m라서 0.35도 사용 가능.
-    # 하지만 35cm 이하 근접값도 보고 싶으면 0.05~0.10으로 낮추는 게 좋음.
-    range_min: 0.05
-
+    range_min: 0.35
     scan_time: 0.3333
     target_frame: laser
     transform_tolerance: 0.01
