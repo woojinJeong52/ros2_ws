@@ -2,34 +2,36 @@ frame_id: map
 
 waypoints:
   start_area_goal:
-    position: {x: 0.3531208336353302, y: 0.02783779613673687, z: 0.0}
-    orientation: {x: 0.0, y: 0.0, z: -0.003156949648785833, w: 0.9999950168220415}
-
-  start_area_sub_goal:
     position: {x: -0.5975524187088013, y: -0.1691107600927353, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.03402353798656521, w: 0.999421031829367}
 
-  storage_shelf_goal:
+  start_area_sub_goal:
+    position: {x: 0.3531208336353302, y: 0.02783779613673687, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: -0.003156949648785833, w: 0.9999950168220415}
+
+  storage_shelf_sub_goal:
     position: {x: 0.4372992515563965, y: 2.3016648292541504, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: -0.9999994415197359, w: 0.0010568633858362936}
 
-  storage_shelf_sub_goal:
+  storage_shelf_goal:
     position: {x: -0.36468344926834106, y: 2.331491231918335, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.9997339940575057, w: 0.023063848894471894}
 
-  workbench_goal:
+  workbench_sub_goal:
     position: {x: 3.1894690990448, y: 1.4257746934890747, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.7036847296559819, w: 0.7105123512290181}
 
-  workbench_sub_goal:
+
+  workbench_goal:
     position: {x: 3.1554598808288574, y: 2.338207721710205, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.701617917442684, w: 0.7125533649653134}
 
-  customer_counter_goal:
+  customer_counter_sub_goal:
     position: {x: 4.596715450286865, y: 0.21444649994373322, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.008077516164110841, w: 0.9999673763341574}
 
-  customer_counter_sub_goal:
+
+  customer_counter_goal:
     position: {x: 5.047225475311279, y: 0.2288348525762558, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: -0.013917123450877542, w: 0.9999031521476732}
 
