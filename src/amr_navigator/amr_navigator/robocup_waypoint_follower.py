@@ -134,11 +134,7 @@ class RobocupWaypointFollower(Node):
             frame_id = data.get('frame_id')
 
         waypoints_map = data.get('waypoints', {}) if isinstance(data, dict) else {}
-        sequence = (
-            data.get('sequence', ROBOCUP_SEQUENCE)
-            if isinstance(data, dict)
-            else ROBOCUP_SEQUENCE
-        )
+        sequence = list(ROBOCUP_SEQUENCE)
         missing = [name for name in sequence if name not in waypoints_map]
         if missing:
             self.get_logger().error(f'Missing RoboCup waypoints: {missing}')
