@@ -73,7 +73,7 @@ class RobocupWaypointFollower(Node):
 
         # 라이다 angle 0도 기준으로 전방을 본다.
         # 만약 전방 감지가 반대로 잡히면 180.0으로 바꿔서 테스트.
-        self.declare_parameter('front_angle_center_deg', 0.0)
+        self.declare_parameter('front_angle_center_deg', 180.0)
 
         # 전방 중심 기준 ±10도만 사용
         self.declare_parameter('front_angle_deg', 10.0)
