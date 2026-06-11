@@ -5,8 +5,8 @@
     inverse1: false
     inverse2: false
     laser1Alpha: 0.0
-    laser1AngleMin: 95.0
-    laser1AngleMax: 265.0
+    laser1AngleMin: 5.0
+    laser1AngleMax: 175.0
     laser1B: 0
     laser1G: 0
     laser1R: 255
@@ -14,8 +14,8 @@
     laser1YOff:  0.0     # URDF: lidar1_link y=0.0
     laser1ZOff:  0.04    # URDF: lidar1_link z=0.04
     laser2Alpha: 180.0
-    laser2AngleMin: 95.0
-    laser2AngleMax: 265.0
+    laser2AngleMin: 5.0
+    laser2AngleMax: 175.0
     laser2B: 255
     laser2G: 0
     laser2R: 0
