@@ -12,6 +12,14 @@ def quaternion_to_yaw(x: float, y: float, z: float, w: float) -> float:
     return math.atan2(siny_cosp, cosy_cosp)
 
 
+def normalize_angle(angle: float) -> float:
+    while angle > math.pi:
+        angle -= 2.0 * math.pi
+    while angle < -math.pi:
+        angle += 2.0 * math.pi
+    return angle
+
+
 class CurrentPosePrinter(Node):
     def __init__(self):
         super().__init__('robocup_current_pose')
@@ -22,6 +30,10 @@ class CurrentPosePrinter(Node):
         self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('waypoint_name', 'new_waypoint')
         self.declare_parameter('timeout_sec', 3.0)
+        self.declare_parameter('tf_sample_count', 5)
+        self.declare_parameter('tf_sample_period_sec', 0.1)
+        self.declare_parameter('max_tf_position_jump_m', 0.10)
+        self.declare_parameter('max_tf_yaw_jump_rad', 0.35)
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
@@ -43,8 +55,14 @@ class CurrentPosePrinter(Node):
         target_frame = self.get_parameter('target_frame').value
         source_frame = self.get_parameter('source_frame').value
         timeout_sec = float(self.get_parameter('timeout_sec').value)
+        sample_count = max(1, int(self.get_parameter('tf_sample_count').value))
+        sample_period_sec = max(
+            0.0,
+            float(self.get_parameter('tf_sample_period_sec').value),
+        )
 
         deadline = self.get_clock().now().nanoseconds / 1e9 + timeout_sec
+        samples = []
 
         while rclpy.ok():
             now_sec = self.get_clock().now().nanoseconds / 1e9
@@ -61,12 +79,69 @@ class CurrentPosePrinter(Node):
                     source_frame,
                     rclpy.time.Time(),
                 )
-                self._print_transform(transform)
-                return True
+                samples.append(transform)
+
+                if len(samples) >= sample_count:
+                    if not self._validate_tf_samples(samples):
+                        return False
+                    self._print_transform(samples[-1])
+                    return True
+
+                rclpy.spin_once(self, timeout_sec=sample_period_sec)
             except TransformException:
                 rclpy.spin_once(self, timeout_sec=0.1)
 
         return False
+
+    def _validate_tf_samples(self, samples) -> bool:
+        if len(samples) <= 1:
+            return True
+
+        max_position_jump_m = float(
+            self.get_parameter('max_tf_position_jump_m').value
+        )
+        max_yaw_jump_rad = float(
+            self.get_parameter('max_tf_yaw_jump_rad').value
+        )
+        first = samples[0].transform
+        first_yaw = quaternion_to_yaw(
+            first.rotation.x,
+            first.rotation.y,
+            first.rotation.z,
+            first.rotation.w,
+        )
+
+        largest_position_jump = 0.0
+        largest_yaw_jump = 0.0
+
+        for sample in samples[1:]:
+            current = sample.transform
+            position_jump = math.hypot(
+                current.translation.x - first.translation.x,
+                current.translation.y - first.translation.y,
+            )
+            yaw = quaternion_to_yaw(
+                current.rotation.x,
+                current.rotation.y,
+                current.rotation.z,
+                current.rotation.w,
+            )
+            yaw_jump = abs(normalize_angle(yaw - first_yaw))
+
+            largest_position_jump = max(largest_position_jump, position_jump)
+            largest_yaw_jump = max(largest_yaw_jump, yaw_jump)
+
+        if (largest_position_jump > max_position_jump_m
+                or largest_yaw_jump > max_yaw_jump_rad):
+            self.get_logger().error(
+                'Unstable TF samples. '
+                f'position_jump={largest_position_jump:.3f} m, '
+                f'yaw_jump={largest_yaw_jump:.3f} rad. '
+                'Check localization convergence or duplicate TF publishers.'
+            )
+            return False
+
+        return True
 
     def _print_odom_pose(self) -> bool:
         odom_topic = self.get_parameter('odom_topic').value
@@ -122,7 +197,18 @@ class CurrentPosePrinter(Node):
                              orientation):
         t = position
         q = orientation
-        yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w)
+        qx = q.x
+        qy = q.y
+        qz = q.z
+        qw = q.w
+
+        if qw < 0.0:
+            qx = -qx
+            qy = -qy
+            qz = -qz
+            qw = -qw
+
+        yaw = quaternion_to_yaw(qx, qy, qz, qw)
 
         print(f'frame_id: {frame_id}')
         print()
@@ -134,8 +220,8 @@ class CurrentPosePrinter(Node):
         )
         print(
             '    orientation: '
-            f'{{x: {q.x:.16f}, y: {q.y:.16f}, '
-            f'z: {q.z:.16f}, w: {q.w:.16f}}}'
+            f'{{x: {qx:.16f}, y: {qy:.16f}, '
+            f'z: {qz:.16f}, w: {qw:.16f}}}'
         )
         print()
         print(f'# yaw_rad: {yaw:.16f}')

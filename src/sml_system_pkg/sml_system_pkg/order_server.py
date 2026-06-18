@@ -11,7 +11,7 @@ from sml_msgs.msg import Task, Order, Station
 ST_STORAGE   = Station.ST_STORAGE
 ST_WORKBENCH = Station.ST_WORKBENCH
 ST_CUSTOMER  = Station.ST_CUSTOMER
-ST_HYBRID    = Station.ST_HYBRID
+ST_HYBRID    = Station.ST_HYBRID   # 메시지 정의는 유지하지만 더 이상 사용하지 않음 (아레나에 Hybrid 없음)
 
 # Order Type
 OT_PRODUCE = Order.OT_PRODUCE
@@ -65,6 +65,29 @@ TIER_NAMES  = {1: 'entry', 2: 'beginner', 3: 'advanced', 4: 'expert'}
 STAGE_NAMES = {1: 'production', 2: 'recycling', 3: 'lifecycle'}
 
 
+# ─────────────────────────────────────────────────────────────
+# 고정 아레나 배치 (German Open 2026 규정 기준)
+#   station_id = 0 (START/GOAL)은 arena_layout에 포함하지 않음
+#   → AMR/Manager 쪽에서 별도 좌표로 관리
+# ─────────────────────────────────────────────────────────────
+STATION_LAYOUT = {
+    1: ST_STORAGE,
+    2: ST_STORAGE,
+    3: ST_WORKBENCH,
+    4: ST_STORAGE,
+    5: ST_STORAGE,
+    6: ST_WORKBENCH,   # 로봇팔 2대, 메인 작업공간 (코드상 구분 없음, 참고용)
+    7: ST_WORKBENCH,
+    8: ST_CUSTOMER,
+}
+
+STATION_COUNT = len(STATION_LAYOUT)  # 8, 항상 고정
+
+STORAGE_STATION_IDS = [sid for sid, t in STATION_LAYOUT.items() if t == ST_STORAGE]
+WORKBENCH_STATION_IDS = [sid for sid, t in STATION_LAYOUT.items() if t == ST_WORKBENCH]
+CUSTOMER_STATION_IDS = [sid for sid, t in STATION_LAYOUT.items() if t == ST_CUSTOMER]
+
+
 class OrderServer(Node):
     def __init__(self):
         super().__init__('order_server')
@@ -96,7 +119,9 @@ class OrderServer(Node):
         # ── 자동 설정 ──────────────────────────────────────────
         self.produce_count = self.config['orders']
         self.recycle_count = self.config['returns']
-        self.station_count = self._calc_station_count()
+
+        # 아레나가 고정되었으므로 station_count는 더 이상 동적 계산하지 않음
+        self.station_count = STATION_COUNT
 
         # 개별 블록 사용 (배치 컨테이너 없음)
         self.use_batches = False
@@ -119,16 +144,6 @@ class OrderServer(Node):
         self.timer = self.create_timer(3.0, self.publish_task)
 
     # ──────────────────────────────────────────────────────────
-    # 스테이션 수 자동 계산
-    # ──────────────────────────────────────────────────────────
-
-    def _calc_station_count(self):
-        raw_target, raw_variance = self.config['raw_mat']
-        raw_upper        = raw_target + raw_variance
-        storage_stations = max(2, math.ceil(raw_upper / 5))
-        return min(storage_stations + 2, 12)   # +workbench(1) +customer(1)
-
-    # ──────────────────────────────────────────────────────────
     # 원자재 수 검증 (batch 변환 전 개수 기준)
     # ──────────────────────────────────────────────────────────
 
@@ -140,7 +155,9 @@ class OrderServer(Node):
             _, material_ids = PRODUCT_DB[order.product_id]
             if order.order_type == OT_PRODUCE:
                 total_raw += len(material_ids)
-            elif order.order_type == OT_RECYCLE and self.recycled_to_storage:
+            elif order.order_type == OT_RECYCLE:
+                # 분해로 발생하는 원자재 총량은 recycled_to_storage(창고 재배치 여부)와
+                # 무관하게 항상 검증 대상에 포함한다 (raw_mat는 "발생량" 기준).
                 total_raw += len(material_ids)
 
         low  = raw_target - raw_variance
@@ -254,39 +271,23 @@ class OrderServer(Node):
                 if self.recycled_to_storage:
                     storage_materials.extend(material_ids)
 
-        arena_layout        = []
-        storage_station_ids = []
-
-        for station_id in range(1, self.station_count + 1):
-            if station_id == 2:
-                continue
-            if station_id == self.station_count:
-                continue
-            if station_id == 1:
-                storage_station_ids.append(station_id)
-            else:
-                if random.random() >= 0.2:
-                    storage_station_ids.append(station_id)
-
+        # 고정 아레나 배치: STATION_LAYOUT 기준으로 station_id/타입을 그대로 사용
         storage_buckets = self.split_materials(
-            storage_materials, len(storage_station_ids)
+            storage_materials, len(STORAGE_STATION_IDS)
         )
 
-        storage_index = 0
+        arena_layout   = []
+        storage_index  = 0
 
-        for station_id in range(1, self.station_count + 1):
-            if station_id == 2:
-                station_type = ST_WORKBENCH
-                material_ids = []
-            elif station_id == self.station_count:
-                station_type = ST_CUSTOMER
-                material_ids = customer_products
-            elif station_id in storage_station_ids:
-                station_type = ST_STORAGE
+        for station_id in sorted(STATION_LAYOUT.keys()):
+            station_type = STATION_LAYOUT[station_id]
+
+            if station_type == ST_STORAGE:
                 material_ids = storage_buckets[storage_index]
                 storage_index += 1
-            else:
-                station_type = ST_HYBRID
+            elif station_type == ST_CUSTOMER:
+                material_ids = customer_products
+            else:  # ST_WORKBENCH
                 material_ids = []
 
             arena_layout.append({
@@ -320,7 +321,7 @@ class OrderServer(Node):
         print(f'# produce_count   = {self.produce_count}')
         print(f'# recycle_count   = {self.recycle_count}')
         print(f'# raw_materials   = {total_raw}  (목표: {raw_target}±{raw_variance})')
-        print(f'# station_count   = {self.station_count}')
+        print(f'# station_count   = {self.station_count} (고정)')
         print()
 
         print('order_list = ')

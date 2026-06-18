@@ -349,6 +349,7 @@ ros2 run robocup_navigator robocup_current_pose --ros-args \
 
 기본적으로 `map -> base_link` TF를 읽어서 아래 형태로 출력한다.
 파일에는 저장하지 않는다.
+TF는 여러 번 샘플링하며, 위치나 yaw가 크게 튀면 잘못된 waypoint 출력을 막고 실패한다.
 
 ```yaml
 frame_id: map
@@ -379,6 +380,21 @@ ros2 run robocup_navigator robocup_current_pose --ros-args \
   -p source_frame:=base_link \
   -p waypoint_name:=new_waypoint
 ```
+
+TF 샘플링 기준을 조정하려면:
+
+```bash
+ros2 run robocup_navigator robocup_current_pose --ros-args \
+  -p target_frame:=map \
+  -p source_frame:=base_link \
+  -p waypoint_name:=new_waypoint \
+  -p tf_sample_count:=10 \
+  -p max_tf_position_jump_m:=0.05 \
+  -p max_tf_yaw_jump_rad:=0.15
+```
+
+`/goal_pose`는 RViz에서 마우스로 찍은 goal이고, `map -> base_link`는 실제 로봇 현재 위치다.
+두 값이 갑자기 크게 다르면 localization 수렴 상태나 중복 TF publisher를 확인한다.
 
 ## 10. 실패 원인
 

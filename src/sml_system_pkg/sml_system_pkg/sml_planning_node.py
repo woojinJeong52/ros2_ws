@@ -19,6 +19,10 @@ PRODUCT_NAMES = {
     48132: 'Ice Cream', 46262: 'Big Tree',
 }
 
+# 대회 arena_layout에는 포함되지 않는 AMR의 시작/복귀 지점.
+# 모든 작업이 끝난 뒤 AMR이 마지막으로 복귀해야 하는 station_id.
+STATION_START_GOAL = 0
+
 
 class PlanningNode(Node):
 
@@ -438,6 +442,21 @@ class PlanningNode(Node):
             slot_material = []
             pending_loads = []
 
+        # ------------------------------------------------
+        # 모든 작업 완료 후: AMR이 START/GOAL(00)으로 복귀
+        # 00은 arena_layout에 들어오지 않는 station이므로
+        # 별도 상수(STATION_START_GOAL)를 사용한다.
+        # 직전에 생성된 모든 스텝이 끝난 뒤 실행되도록
+        # 마지막 스텝에 의존시킨다.
+        # ------------------------------------------------
+        if step_id > 0:
+            last_step_id = step_id - 1
+            steps.append(self._make_step(
+                step_id, Step.AMR, Step.GOAL,
+                [], STATION_START_GOAL, [last_step_id]
+            ))
+            step_id += 1
+
         return steps
 
     # --------------------------------------------------------
@@ -532,6 +551,7 @@ class PlanningNode(Node):
             Step.UNLOAD:  'UNLOAD ',
             Step.PRODUCE: 'PRODUCE',
             Step.RECYCLE: 'RECYCLE',
+            Step.GOAL:    'GOAL   ',
         }
         self.get_logger().info('===== 스텝 시퀀스 =====')
         for s in steps:

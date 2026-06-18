@@ -6,6 +6,7 @@ int32 LOAD=0
 int32 UNLOAD=1
 int32 PRODUCE=2
 int32 RECYCLE=3
+int32 GOAL=4
 
 int32   step_id
 int32   type

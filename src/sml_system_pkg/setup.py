@@ -24,6 +24,7 @@ setup(
             'sml_planning_node = sml_system_pkg.sml_planning_node:main',
             'sml_manager_node  = sml_system_pkg.sml_manager_node:main',
             'mock_nav_node     = sml_system_pkg.mock_nav_node:main',
+            'mock_arm_node     = sml_system_pkg.mock_arm_node:main',
             'mock_wb_node      = sml_system_pkg.mock_wb_node:main',
         ],
     },

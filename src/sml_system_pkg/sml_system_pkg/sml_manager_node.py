@@ -255,7 +255,18 @@ class SmlManagerNode(Node):
             return
 
         self.get_logger().info(
-            f'[NAV] step {step.step_id} 도착 완료 → ARM 실행')
+            f'[NAV] step {step.step_id} 도착 완료')
+
+        if step.action == Step.GOAL:
+            # 단순 이동(00 복귀)이므로 ARM 호출 없이 바로 완료 처리
+            self.get_logger().info(
+                f'[NAV] step {step.step_id} GOAL 도착 → ARM 생략, 완료 처리')
+            with self._lock:
+                self.amr_busy = False
+            self._on_step_complete(step.step_id)
+            return
+
+        self.get_logger().info(f'[NAV] step {step.step_id} → ARM 실행')
         self._execute_arm(step)
 
     def _execute_arm(self, step, retry=0):
@@ -394,6 +405,7 @@ class SmlManagerNode(Node):
             Step.UNLOAD:  'UNLOAD ',
             Step.PRODUCE: 'PRODUCE',
             Step.RECYCLE: 'RECYCLE',
+            Step.GOAL:    'GOAL   ',
         }
         self.get_logger().info('===== 수신된 스텝 시퀀스 =====')
         for s in steps:
