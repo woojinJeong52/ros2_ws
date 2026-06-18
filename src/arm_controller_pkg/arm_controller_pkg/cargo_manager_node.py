@@ -1,0 +1,125 @@
+import rclpy
+from rclpy.node import Node
+from arm_interfaces.srv import Cargo
+
+
+MATERIAL_NAMES = {
+    1: "2x2_red",
+    2: "2x2_green",
+    3: "2x2_blue",
+    4: "2x2_yellow",
+    5: "4x2_red",
+    6: "4x2_green",
+    7: "4x2_blue",
+    8: "4x2_yellow",
+}
+
+PRODUCT_SLOT = 1
+MATERIAL_SLOTS = [2, 3, 4, 5, 6]
+
+
+class CargoManagerNode(Node):
+    def __init__(self):
+        super().__init__('cargo_manager_node')
+        self.srv = self.create_service(Cargo, '/cargo', self.cargo_cb)
+
+        self.slot_state = {slot: None for slot in [PRODUCT_SLOT] + MATERIAL_SLOTS}
+
+        self.get_logger().info('[CARGO] cargo_manager_node started')
+        self.get_logger().info(f'[CARGO] slots: {list(self.slot_state.keys())}')
+
+    def cargo_cb(self, request, response):
+        action = request.action.upper()
+
+        if action == 'FIND_EMPTY':
+            if request.object_id > 8:
+                search_slots = [PRODUCT_SLOT]
+            else:
+                search_slots = MATERIAL_SLOTS
+
+            for slot in search_slots:
+                if self.slot_state[slot] is None:
+                    response.success = True
+                    response.slot = slot
+                    response.message = f'empty slot found: slot={slot}'
+                    self.get_logger().info(f'[CARGO] {response.message}')
+                    return response
+
+            response.success = False
+            response.slot = -1
+            response.message = 'no empty slot'
+            self.get_logger().warn(f'[CARGO] {response.message}')
+
+        elif action == 'FIND_OBJECT':
+            for slot, obj in self.slot_state.items():
+                if obj == request.object_id:
+                    response.success = True
+                    response.slot = slot
+                    response.message = f'object found: object_id={request.object_id}, slot={slot}'
+                    self.get_logger().info(f'[CARGO] {response.message}')
+                    return response
+            response.success = False
+            response.slot = -1
+            response.message = f'object_id={request.object_id} not found'
+            self.get_logger().warn(f'[CARGO] {response.message}')
+
+        elif action == 'SET':
+            slot = request.slot
+            if slot not in self.slot_state:
+                response.success = False
+                response.message = f'invalid slot={slot}'
+            else:
+                prev = self.slot_state[slot]
+                self.slot_state[slot] = request.object_id
+                name = MATERIAL_NAMES.get(request.object_id, f'product_id={request.object_id}')
+                response.success = True
+                response.slot = slot
+                response.message = f'slot={slot} updated: {prev} -> object_id={request.object_id} ({name})'
+                self.get_logger().info(f'[CARGO] {response.message}')
+
+        elif action == 'CLEAR':
+            slot = request.slot
+            if slot not in self.slot_state:
+                response.success = False
+                response.message = f'invalid slot={slot}'
+            else:
+                self.slot_state[slot] = None
+                response.success = True
+                response.slot = slot
+                response.message = f'slot={slot} cleared'
+                self.get_logger().info(f'[CARGO] {response.message}')
+
+        elif action == 'STATUS':
+            lines = []
+            for slot, obj in self.slot_state.items():
+                if obj is None:
+                    name = 'empty'
+                else:
+                    name = MATERIAL_NAMES.get(obj, f'product_id={obj}')
+                lines.append(f'slot={slot}: {name}')
+            response.success = True
+            response.message = ' | '.join(lines)
+            self.get_logger().info(f'[CARGO] STATUS: {response.message}')
+
+        else:
+            response.success = False
+            response.message = f'unknown action: {action}'
+            self.get_logger().error(f'[CARGO] {response.message}')
+
+        return response
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = CargoManagerNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
