@@ -81,12 +81,12 @@ class RobocupNavigator(Node):
 
         self.declare_parameter('backup_after_goal', True)
         self.declare_parameter('backup_distance', 0.20)
-        self.declare_parameter('backup_speed', 0.08)
+        self.declare_parameter('backup_speed', 0.14)
         self.declare_parameter('backup_timeout_sec', 5.0)
 
         self.declare_parameter('rotate_after_backup', True)
         self.declare_parameter('rotate_angle_deg', 150.0)
-        self.declare_parameter('rotate_angular_speed', 1.0)
+        self.declare_parameter('rotate_angular_speed', 1.4)
         self.declare_parameter('rotate_timeout_sec', 8.0)
         self.declare_parameter('motion_period_sec', 0.05)
 
