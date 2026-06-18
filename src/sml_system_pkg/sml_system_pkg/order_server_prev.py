@@ -141,9 +141,7 @@ class OrderServer(Node):
         self.task, self.arena_layout = self._generate_with_validation()
         self.print_official_style(self.task, self.arena_layout)
 
-        # 엔터를 치면 그 시점에 task를 publish (확인 후 진행)
-        input('엔터를 누르면 task를 publish합니다 (플래너로 전달): ')
-        self.publish_task()
+        self.timer = self.create_timer(3.0, self.publish_task)
 
     # ──────────────────────────────────────────────────────────
     # 원자재 수 검증 (batch 변환 전 개수 기준)
