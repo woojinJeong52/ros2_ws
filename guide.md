@@ -415,3 +415,17 @@ CANCELED: 액션 cancel 요청
 4. station별로 액션 단독 테스트를 반복한다.
 5. `target_front_distance`, `backup_distance`, `rotate_angle_deg`를 실제 로봇팔 작업 자세 기준으로 튜닝한다.
 6. MasterPC 연동 전 `/navigate_to_station` 단독 성공률을 먼저 확보한다.
+
+
+## 
+
+ros2 launch all_in_one_package all_in_one_launch
+
+ros2 launch robocup_navigator robocup_navigator
+
+ros2 run sml_system_pkg mock_wb_node
+
+ros2 run sml_system_pkg sml_manager_node
+
+ros2 run sml_system_pkg order_server
+

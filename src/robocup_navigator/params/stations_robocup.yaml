@@ -33,14 +33,14 @@ stations:
       - storage_shelf_goal
     post_process: true
 
-  2:
+  6:
     name: workbench
     sequence:
       - workbench_sub_goal
       - workbench_goal
     post_process: true
 
-  3:
+  8:
     name: customer_counter
     sequence:
       - customer_counter_sub_goal
