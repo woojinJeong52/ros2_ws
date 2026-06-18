@@ -43,6 +43,7 @@ class SmlManagerNode(Node):
         # GetPlan 재시도 관련
         self._plan_retry_count = 0
         self._plan_timer       = None
+        self._max_plan_retries = 10
 
         # ── Subscriber ─────────────────────────────────────
         self.task_sub = self.create_subscription(
@@ -94,30 +95,22 @@ class SmlManagerNode(Node):
             self._plan_timer = None
 
         if not self.get_plan_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().error('[MANAGER] GetPlan 서비스 없음')
+            self._retry_get_plan('GetPlan 서비스 없음')
             return
 
         future = self.get_plan_client.call_async(GetPlan.Request())
         future.add_done_callback(self._on_get_plan_response)
 
     def _on_get_plan_response(self, future):
-        MAX_RETRY = 10
-
         try:
             response = future.result()
         except Exception as e:
             self.get_logger().error(f'[MANAGER] GetPlan 호출 예외: {e}')
+            self._retry_get_plan('GetPlan 호출 예외')
             return
 
         if not response.success:
-            self._plan_retry_count += 1
-            if self._plan_retry_count <= MAX_RETRY:
-                self.get_logger().warn(
-                    f'[MANAGER] 계획 미생성, 재시도 '
-                    f'({self._plan_retry_count}/{MAX_RETRY})')
-                self._plan_timer = self.create_timer(0.5, self._try_get_plan)
-            else:
-                self.get_logger().error('[MANAGER] GetPlan 최대 재시도 초과')
+            self._retry_get_plan('계획 미생성')
             return
 
         self.get_logger().info(
@@ -128,6 +121,19 @@ class SmlManagerNode(Node):
             self.pending_steps = list(response.steps)
 
         self._dispatch()
+
+    def _retry_get_plan(self, reason):
+        self._plan_retry_count += 1
+        if self._plan_retry_count <= self._max_plan_retries:
+            self.get_logger().warn(
+                f'[MANAGER] {reason}, 재시도 '
+                f'({self._plan_retry_count}/{self._max_plan_retries})')
+            self._plan_timer = self.create_timer(0.5, self._try_get_plan)
+            return
+
+        self.get_logger().error('[MANAGER] GetPlan 최대 재시도 초과')
+        with self._lock:
+            self.plan_requested = False
 
     # ──────────────────────────────────────────────────────
     # 스텝 디스패치 (핵심 로직)
