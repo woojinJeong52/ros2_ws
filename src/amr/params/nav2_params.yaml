@@ -230,6 +230,7 @@ local_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
+          observation_persistence: 2.0
       static_layer:
         map_subscribe_transient_local: True
       always_send_full_costmap: True
