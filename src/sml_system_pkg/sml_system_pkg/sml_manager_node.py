@@ -8,6 +8,7 @@ depends_on 기반으로 AMR / WB를 병렬 실행하는 노드.
   서비스 /sml/get_plan     (sml_msgs/GetPlan)   ← planning_node
   Action navigate_to_station (sml_msgs/NavTask) → amr_nav_node
   서비스 /amr_robot_command  (sml_msgs/ArmCommand) → amr_robot_node
+  서비스 /robocup_navigator/post_process (std_srvs/Trigger) → robocup_navigator
   Action wb_task             (sml_msgs/WbTask)  → workbench_node
   발행  /sml/status        (std_msgs/String)    모니터링용
 """
@@ -20,6 +21,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 from sml_msgs.action import NavTask, WbTask
 from sml_msgs.msg import Step, Task
@@ -45,6 +47,11 @@ class SmlManagerNode(Node):
         self._plan_timer       = None
         self._max_plan_retries = 10
 
+        self.declare_parameter(
+            'post_process_service_name',
+            '/robocup_navigator/post_process',
+        )
+
         # ── Subscriber ─────────────────────────────────────
         self.task_sub = self.create_subscription(
             Task, '/sml/task',
@@ -57,6 +64,10 @@ class SmlManagerNode(Node):
             callback_group=self.cbg)
         self.arm_client = self.create_client(
             ArmCommand, '/amr_robot_command',
+            callback_group=self.cbg)
+        self.post_process_client = self.create_client(
+            Trigger,
+            self.get_parameter('post_process_service_name').value,
             callback_group=self.cbg)
 
         # ── Action Clients ─────────────────────────────────
@@ -329,6 +340,58 @@ class SmlManagerNode(Node):
         self.get_logger().info(
             f'[ARM] step {step.step_id} 완료 '
             f'| slots={list(response.slots)}')
+        self._execute_nav_post_process(step)
+
+    def _execute_nav_post_process(self, step, retry=0):
+        MAX_RETRY = 1
+
+        if not self.post_process_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error(
+                f'[POST] step {step.step_id}: post_process 서비스 없음')
+            with self._lock:
+                self.amr_busy = False
+            return
+
+        self.get_logger().info(
+            f'[POST] step {step.step_id} → navigator 후처리 실행')
+
+        future = self.post_process_client.call_async(Trigger.Request())
+        future.add_done_callback(
+            lambda f, s=step, r=retry: self._on_nav_post_process_result(
+                f, s, r))
+
+    def _on_nav_post_process_result(self, future, step, retry):
+        MAX_RETRY = 1
+
+        try:
+            response = future.result()
+        except Exception as e:
+            self.get_logger().error(
+                f'[POST] step {step.step_id} 예외: {e}')
+            if retry < MAX_RETRY:
+                self.get_logger().warn(
+                    f'[POST] step {step.step_id} 재시도 '
+                    f'({retry+1}/{MAX_RETRY})')
+                self._execute_nav_post_process(step, retry + 1)
+            else:
+                with self._lock:
+                    self.amr_busy = False
+            return
+
+        if not response.success:
+            self.get_logger().error(
+                f'[POST] step {step.step_id} 실패: {response.message}')
+            if retry < MAX_RETRY and response.message != 'NO_PENDING_POST_PROCESS':
+                self.get_logger().warn(
+                    f'[POST] step {step.step_id} 재시도 '
+                    f'({retry+1}/{MAX_RETRY})')
+                self._execute_nav_post_process(step, retry + 1)
+            else:
+                with self._lock:
+                    self.amr_busy = False
+            return
+
+        self.get_logger().info(f'[POST] step {step.step_id} 완료')
         with self._lock:
             self.amr_busy = False
         self._on_step_complete(step.step_id)

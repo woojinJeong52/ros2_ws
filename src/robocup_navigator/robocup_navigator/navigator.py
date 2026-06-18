@@ -22,6 +22,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
+from std_srvs.srv import Trigger
 
 from sml_msgs.action import NavTask
 
@@ -44,6 +45,7 @@ class RobocupNavigator(Node):
         self._busy_lock = Lock()
         self._busy = False
         self._active_nav_goal_handle = None
+        self._pending_post_process_profile: Optional[StationProfile] = None
 
         default_yaml = str(
             Path(get_package_share_directory('robocup_navigator'))
@@ -54,6 +56,10 @@ class RobocupNavigator(Node):
         self.declare_parameter('stations_file', default_yaml)
         self.declare_parameter('frame_id', 'map')
         self.declare_parameter('navigate_action_name', 'navigate_to_station')
+        self.declare_parameter(
+            'post_process_service_name',
+            '/robocup_navigator/post_process',
+        )
 
         self.declare_parameter('follow_waypoints_action_name',
                                'follow_waypoints')
@@ -108,6 +114,9 @@ class RobocupNavigator(Node):
             'follow_waypoints_action_name'
         ).value
         nav_action = self.get_parameter('navigate_action_name').value
+        post_process_service = self.get_parameter(
+            'post_process_service_name'
+        ).value
         cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         scan_topic = self.get_parameter('scan_topic').value
 
@@ -134,9 +143,16 @@ class RobocupNavigator(Node):
             cancel_callback=self._cancel_callback,
             callback_group=self._cbg,
         )
+        self._post_process_srv = self.create_service(
+            Trigger,
+            post_process_service,
+            self._post_process_callback,
+            callback_group=self._cbg,
+        )
 
         self.get_logger().info(
             f'Robocup navigator ready: action="{nav_action}", '
+            f'post_process="{post_process_service}", '
             f'stations={sorted(self._stations.keys())}, scan="{scan_topic}"'
         )
 
@@ -367,10 +383,14 @@ class RobocupNavigator(Node):
             if not ok:
                 return False, reason
 
-        if profile.post_process:
-            ok, reason = self._run_post_process(goal_handle, profile)
+        if profile.post_process and self._approach_after_goal:
+            ok, reason = self._run_front_alignment(goal_handle, profile)
             if not ok:
                 return False, reason
+
+        self._pending_post_process_profile = (
+            profile if profile.post_process else None
+        )
 
         self._publish_feedback(
             goal_handle,
@@ -380,6 +400,46 @@ class RobocupNavigator(Node):
             f'[STATION DONE] id={station_id}, name="{profile.name}"'
         )
         return True, ''
+
+    def _post_process_callback(self, request, response):
+        del request
+
+        with self._busy_lock:
+            if self._busy:
+                response.success = False
+                response.message = 'BUSY'
+                return response
+            self._busy = True
+
+        try:
+            profile = self._pending_post_process_profile
+            if profile is None:
+                response.success = True
+                response.message = 'NO_PENDING_POST_PROCESS'
+                return response
+
+            ok, reason = self._run_departure_post_process(profile)
+            if ok:
+                self._pending_post_process_profile = None
+                response.success = True
+                response.message = ''
+            else:
+                response.success = False
+                response.message = reason
+
+            return response
+
+        except Exception as exc:
+            self.get_logger().error(f'Post-process exception: {exc}')
+            self._publish_zero_velocity()
+            response.success = False
+            response.message = 'POST_PROCESS_FAILED'
+            return response
+
+        finally:
+            self._publish_zero_velocity()
+            with self._busy_lock:
+                self._busy = False
 
     def _navigate_to_waypoint(self, goal_handle, waypoint_name: str,
                               index: int, total: int):
@@ -530,19 +590,14 @@ class RobocupNavigator(Node):
             self.get_logger().error(f'Invalid waypoint "{name}": {exc}')
             return None
 
-    def _run_post_process(self, goal_handle, profile: StationProfile):
-        if self._approach_after_goal:
-            ok, reason = self._run_front_alignment(goal_handle, profile)
-            if not ok:
-                return False, reason
-
+    def _run_departure_post_process(self, profile: StationProfile):
         if self._backup_after_goal:
-            ok, reason = self._run_backup(goal_handle, profile)
+            ok, reason = self._run_backup(None, profile)
             if not ok:
                 return False, reason
 
         if self._rotate_after_backup:
-            ok, reason = self._run_rotation(goal_handle, profile)
+            ok, reason = self._run_rotation(None, profile)
             if not ok:
                 return False, reason
 
@@ -616,17 +671,18 @@ class RobocupNavigator(Node):
         start = time.monotonic()
         self._publish_zero_velocity()
 
-        self._publish_feedback(
-            goal_handle,
-            f'BACKING_UP station={profile.station_id} name={profile.name}',
-        )
+        if goal_handle is not None:
+            self._publish_feedback(
+                goal_handle,
+                f'BACKING_UP station={profile.station_id} name={profile.name}',
+            )
         self.get_logger().info(
             f'[BACKUP START] distance={self._backup_distance:.3f} m, '
             f'speed={self._backup_speed:.3f} m/s'
         )
 
         while rclpy.ok():
-            if goal_handle.is_cancel_requested:
+            if goal_handle is not None and goal_handle.is_cancel_requested:
                 self._publish_zero_velocity()
                 return False, 'CANCELED'
 
@@ -659,17 +715,18 @@ class RobocupNavigator(Node):
         start = time.monotonic()
         self._publish_zero_velocity()
 
-        self._publish_feedback(
-            goal_handle,
-            f'ROTATING_LEFT station={profile.station_id} name={profile.name}',
-        )
+        if goal_handle is not None:
+            self._publish_feedback(
+                goal_handle,
+                f'ROTATING_LEFT station={profile.station_id} name={profile.name}',
+            )
         self.get_logger().info(
             f'[ROTATE START] angle={self._rotate_angle_deg:.1f} deg, '
             f'angular_speed={self._rotate_angular_speed:.3f} rad/s'
         )
 
         while rclpy.ok():
-            if goal_handle.is_cancel_requested:
+            if goal_handle is not None and goal_handle.is_cancel_requested:
                 self._publish_zero_velocity()
                 return False, 'CANCELED'
 

@@ -15,9 +15,11 @@ station_id 수신
 -> sub goal 이동
 -> main goal 이동
 -> /scan 기반 전방 거리 정렬
+-> 액션 success 반환
+-> manager가 로봇팔 LOAD/UNLOAD 실행
+-> manager가 /robocup_navigator/post_process 호출
 -> 후진
 -> 좌회전
--> 액션 success 반환
 -> 다음 goal 대기
 ```
 
@@ -25,6 +27,18 @@ station_id 수신
 
 ```text
 /navigate_to_station
+```
+
+로봇팔 작업 이후 이탈 동작 서비스:
+
+```text
+/robocup_navigator/post_process
+```
+
+서비스 타입:
+
+```text
+std_srvs/srv/Trigger
 ```
 
 액션 타입:
@@ -288,6 +302,7 @@ backup_distance: 0.20
 backup_speed: 0.08
 rotate_angle_deg: 150.0
 rotate_angular_speed: 0.5
+post_process_service_name: /robocup_navigator/post_process
 ```
 
 예시:
@@ -417,9 +432,9 @@ CANCELED: 액션 cancel 요청
 6. MasterPC 연동 전 `/navigate_to_station` 단독 성공률을 먼저 확보한다.
 
 
-## 
+## START
 
-ros2 launch all_in_one_package all_in_one_launch
+ros2 launch all_in_one_package all_in_one_launch.py
 
 ros2 run robocup_navigator robocup_navigator
 
@@ -432,4 +447,3 @@ ros2 run sml_system_pkg sml_planning_node
 ros2 run sml_system_pkg sml_manager_node
 
 ros2 run sml_system_pkg order_server
-
