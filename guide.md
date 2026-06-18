@@ -425,6 +425,8 @@ ros2 run robocup_navigator robocup_navigator
 
 ros2 run sml_system_pkg mock_wb_node
 
+ros2 run sml_system_pkg mock_wb_node
+
 ros2 run sml_system_pkg sml_planning_node
 
 ros2 run sml_system_pkg sml_manager_node

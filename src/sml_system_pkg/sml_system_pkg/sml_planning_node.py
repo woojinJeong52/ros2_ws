@@ -22,6 +22,7 @@ PRODUCT_NAMES = {
 # 대회 arena_layout에는 포함되지 않는 AMR의 시작/복귀 지점.
 # 모든 작업이 끝난 뒤 AMR이 마지막으로 복귀해야 하는 station_id.
 STATION_START_GOAL = 0
+MAIN_WORKBENCH_STATION_ID = 6
 
 
 class PlanningNode(Node):
@@ -105,12 +106,19 @@ class PlanningNode(Node):
 
         for station in arena_layout:
             station_materials[station.station_id] = list(station.material_ids)
-            if station.station_type == Station.ST_WORKBENCH:
+            if (station.station_type == Station.ST_WORKBENCH
+                    and station.station_id == MAIN_WORKBENCH_STATION_ID):
                 wb_id = station.station_id
             elif station.station_type == Station.ST_CUSTOMER:
                 customer_id = station.station_id
             elif station.station_type == Station.ST_STORAGE and storage_id is None:
                 storage_id = station.station_id
+
+        if wb_id is None:
+            raise RuntimeError(
+                f'메인 workbench station {MAIN_WORKBENCH_STATION_ID}가 '
+                'arena_layout에 없습니다'
+            )
 
         return station_materials, wb_id, customer_id, storage_id
 
@@ -272,7 +280,7 @@ class PlanningNode(Node):
         slot_1           = None
         slot_material    = []
         pending_loads    = []
-        loaded_materials = set()  # 중복 적재 방지
+        loaded_sources   = set()  # (produce_order_id, material_index)
 
         for wb_task in wb_sequence:
 
@@ -304,13 +312,15 @@ class PlanningNode(Node):
                 for future_task in wb_sequence:
                     if future_task['order_type'] != Order.OT_PRODUCE:
                         continue
-                    for (material, source, dep) in future_task['material_sources']:
+                    for index, (material, source, dep) in enumerate(
+                            future_task['material_sources']):
+                        source_key = (id(future_task), index)
                         if dep is None \
                                 and len(slot_material) < 5 \
-                                and material not in loaded_materials:
+                                and source_key not in loaded_sources:
                             preload_by_station.setdefault(source, []).append(material)
                             slot_material.append(material)
-                            loaded_materials.add(material)
+                            loaded_sources.add(source_key)
 
                 for source, materials in preload_by_station.items():
                     steps.append(self._make_step(
@@ -340,11 +350,13 @@ class PlanningNode(Node):
                     pending_loads = []
 
                 load_by_station = {}
-                for (material, source, dep) in wb_task['material_sources']:
-                    if dep is None and material not in loaded_materials:
+                for index, (material, source, dep) in enumerate(
+                        wb_task['material_sources']):
+                    source_key = (id(wb_task), index)
+                    if dep is None and source_key not in loaded_sources:
                         load_by_station.setdefault(source, []).append(material)
                         slot_material.append(material)
-                        loaded_materials.add(material)
+                        loaded_sources.add(source_key)
 
                 for source, materials in load_by_station.items():
                     steps.append(self._make_step(
