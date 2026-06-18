@@ -340,6 +340,34 @@ cmd_vel 확인:
 ros2 topic echo /cmd_vel
 ```
 
+현재 로봇 위치를 waypoint YAML 형태로 출력:
+
+```bash
+ros2 run robocup_navigator robocup_current_pose --ros-args \
+  -p waypoint_name:=storage_shelf_goal
+```
+
+기본적으로 `map -> base_link` TF를 읽어서 아래 형태로 출력한다.
+파일에는 저장하지 않는다.
+
+```yaml
+frame_id: map
+
+waypoints:
+  storage_shelf_goal:
+    position: {x: 0.0, y: 0.0, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+```
+
+프레임을 바꾸고 싶으면:
+
+```bash
+ros2 run robocup_navigator robocup_current_pose --ros-args \
+  -p target_frame:=map \
+  -p source_frame:=base_link \
+  -p waypoint_name:=new_waypoint
+```
+
 ## 10. 실패 원인
 
 `fail_reason`은 현재 아래 값을 사용한다.

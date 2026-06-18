@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'robocup_navigator = robocup_navigator.navigator:main',
+            'robocup_current_pose = robocup_navigator.current_pose:main',
         ],
     },
 )
