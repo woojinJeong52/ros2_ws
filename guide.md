@@ -359,6 +359,18 @@ waypoints:
     orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
 ```
 
+현재 `/odom` 토픽 기준 pose를 출력하려면:
+
+```bash
+ros2 run robocup_navigator robocup_current_pose --ros-args \
+  -p pose_source:=odom \
+  -p odom_topic:=/odom \
+  -p waypoint_name:=storage_shelf_goal
+```
+
+이 방식은 로봇에 이동 명령을 보내지 않고 `/odom`을 한 번 읽어서 출력한다.
+출력 `frame_id`는 보통 `odom`이다.
+
 프레임을 바꾸고 싶으면:
 
 ```bash

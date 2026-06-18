@@ -2,6 +2,55 @@ frame_id: map
 
 waypoints:
   storage_shelf_sub_goal:
+    position: {x: 0.4372992515563965, y: 2.3016648292541504, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: -0.9985736650837717, w: 0.05339134200564208}
+
+  storage_shelf_goal:
+    position: {x: 0.03630790114402771, y: 2.3165780305862427, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.9995709619505139, w: -0.029289793876440904}
+
+  workbench_sub_goal:
+    position: {x: 3.1894690990448, y: 1.4257746934890747, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.728052587390404, w: 0.6855212833998214}
+
+  workbench_goal:
+    position: {x: 3.1724644899368286, y: 1.8819912075996399, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.7260582645754226, w: 0.6876331845117176}
+
+  customer_counter_sub_goal:
+    position: {x: 4.596715450286865, y: 0.21444649994373322, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.04297095371249332, w: 0.9990763219779752}
+
+  customer_counter_goal:
+    position: {x: 4.821970462799072, y: 0.2216406762599945, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.02098747124589869, w: 0.9997797387678461}
+
+stations:
+  1:
+    name: storage_shelf
+    sequence:
+      - storage_shelf_sub_goal
+      - storage_shelf_goal
+    post_process: true
+
+  2:
+    name: workbench
+    sequence:
+      - workbench_sub_goal
+      - workbench_goal
+    post_process: true
+
+  3:
+    name: customer_counter
+    sequence:
+      - customer_counter_sub_goal
+      - customer_counter_goal
+    post_process: true
+
+    frame_id: map
+
+waypoints:
+  storage_shelf_sub_goal:
     position: {x: -3.3290275031253005, y: 1.7010475260732736, z: 0.0}
     orientation: {x: 0.0, y: 0.0, z: 0.9974916154265883, w: -0.0707847240134157}
 
@@ -46,3 +95,4 @@ stations:
       - customer_counter_sub_goal
       - customer_counter_goal
     post_process: true
+
