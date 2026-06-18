@@ -96,6 +96,10 @@ LOAD_Z_DOWN_MM = 20.0
 LOAD_Z_UP_MM = -20.0
 Z_OFFSET = -85.0
 Z_MARGIN = 40.0
+SCAN_Y_OFFSETS_MM = [0.0, 100.0, -100.0, 180.0, -180.0]
+SCAN_Y_AXIS_INDEX = 1
+SCAN_SETTLE_TIME_SEC = 0.3
+SCAN_VISION_RETRIES_PER_POSE = 1
 
 # --- UNLOAD Z 상수 ---
 UNLOAD_Z_DOWN_MM = 25.0
@@ -241,6 +245,53 @@ class AmrRobotNode(Node):
                 return res
             self.get_logger().warn(f'[AMR] vision retry {i + 1}/{retries}')
             time.sleep(0.5)
+        return None
+
+    def _scan_y_delta(self, dy_mm):
+        delta = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        delta[SCAN_Y_AXIS_INDEX] = float(dy_mm)
+        return delta
+
+    def return_scan_center(self, current_y_offset_mm):
+        if abs(current_y_offset_mm) < 1e-6:
+            return True
+        return self.move_l_rel_checked(
+            self._scan_y_delta(-current_y_offset_mm),
+            label='scan return center',
+        )
+
+    def call_vision_with_y_scan(self, target_color):
+        current_y_offset = 0.0
+
+        for target_y_offset in SCAN_Y_OFFSETS_MM:
+            delta_y = target_y_offset - current_y_offset
+            if abs(delta_y) > 1e-6:
+                if not self.move_l_rel_checked(
+                    self._scan_y_delta(delta_y),
+                    label=f'scan y offset {target_y_offset:.0f}mm',
+                ):
+                    self.get_logger().error(
+                        f'[AMR] scan move failed: y={target_y_offset:.0f}mm')
+                    self.return_scan_center(current_y_offset)
+                    return None
+                current_y_offset = target_y_offset
+
+            time.sleep(SCAN_SETTLE_TIME_SEC)
+            self.get_logger().info(
+                f'[AMR] vision scan at y_offset={current_y_offset:.0f}mm')
+
+            res = self.call_vision(
+                target_color,
+                retries=SCAN_VISION_RETRIES_PER_POSE,
+            )
+            if res:
+                self.get_logger().info(
+                    f'[AMR] vision success at y_offset={current_y_offset:.0f}mm')
+                return res
+
+        self.get_logger().warn('[AMR] vision scan failed at all y offsets')
+        if not self.return_scan_center(current_y_offset):
+            self.get_logger().error('[AMR] failed to return scan center')
         return None
 
     def call_gripper(self, grip: bool):
@@ -509,8 +560,8 @@ class AmrRobotNode(Node):
                 'message': 'go_home failed',
             }
 
-        # 3. HOME 포즈에서 1회만 측정 (YAW / XY / Z 모두 이 값으로 처리)
-        p = self.call_vision(vision_target)
+        # 3. HOME 기준 center -> left -> right -> wide_left -> wide_right 순서로 측정
+        p = self.call_vision_with_y_scan(vision_target)
         if not p:
             self.get_logger().error('[AMR] vision failed')
             self.go_home()
@@ -518,7 +569,7 @@ class AmrRobotNode(Node):
                 'success': False,
                 'slot': -1,
                 'object_id': object_id,
-                'message': 'vision failed',
+                'message': 'OBJECT_NOT_FOUND',
             }
 
         # 4. YAW + XY + Z접근 동시 이동

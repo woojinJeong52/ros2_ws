@@ -1485,7 +1485,7 @@ def create_floor_anchored_3d_box(box_2d, intrinsics, plane_normal, d, max_h, col
 
 
 # 컨트롤 실행부 함수들
-def capture_realsense_data(serial_number, mode="mid_50", warmup_frames=30, visualize=False):
+def capture_realsense_data(serial_number, mode="mid_50", warmup_frames=10, visualize=False):
     """
     특정 리얼센스 카메라를 지정한 모드로 켜서 예열한 뒤, 핵심 비전 데이터를 추출하는 함수.
     
