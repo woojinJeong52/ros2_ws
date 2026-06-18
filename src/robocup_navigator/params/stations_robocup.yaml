@@ -14,8 +14,8 @@ waypoints:
     orientation: {x: 0.0, y: 0.0, z: 0.998, w: 0.070}
 
   station_2_sub_goal:
-    position: {x: 0.879, y: 2.881, z: 0.0}
-    orientation: {x: 0.0, y: 0.0, z: 0.999, w: 0.035}
+    position: {x: 0.799, y: 2.037, z: 0.0}
+    orientation: {x: 0.0, y: 0.0, z: 0.937, w: 0.348}
 
   station_2_goal:
     position: {x: 0.178, y: 2.959, z: 0.0}
