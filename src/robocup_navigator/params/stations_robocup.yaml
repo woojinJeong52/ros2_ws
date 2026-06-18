@@ -33,7 +33,42 @@ stations:
       - storage_shelf_goal
     post_process: true
 
+  2:
+    name: storage_shelf
+    sequence:
+      - storage_shelf_sub_goal
+      - storage_shelf_goal
+    post_process: true
+
+  3:
+    name: workbench
+    sequence:
+      - workbench_sub_goal
+      - workbench_goal
+    post_process: true
+
+  4:
+    name: storage_shelf
+    sequence:
+      - storage_shelf_sub_goal
+      - storage_shelf_goal
+    post_process: true
+
+  5:
+    name: storage_shelf
+    sequence:
+      - storage_shelf_sub_goal
+      - storage_shelf_goal
+    post_process: true
+
   6:
+    name: workbench
+    sequence:
+      - workbench_sub_goal
+      - workbench_goal
+    post_process: true
+
+  7:
     name: workbench
     sequence:
       - workbench_sub_goal

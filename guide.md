@@ -421,7 +421,7 @@ CANCELED: 액션 cancel 요청
 
 ros2 launch all_in_one_package all_in_one_launch
 
-ros2 launch robocup_navigator robocup_navigator
+ros2 run robocup_navigator robocup_navigator
 
 ros2 run sml_system_pkg mock_wb_node
 
