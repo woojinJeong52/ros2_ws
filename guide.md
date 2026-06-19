@@ -432,7 +432,7 @@ CANCELED: 액션 cancel 요청
 6. MasterPC 연동 전 `/navigate_to_station` 단독 성공률을 먼저 확보한다.
 
 
-## START
+## START GUIDE
 
 ros2 launch all_in_one_package all_in_one_launch.py
 
