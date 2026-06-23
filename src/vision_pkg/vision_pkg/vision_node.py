@@ -34,7 +34,7 @@ class VisionNode(Node):
                 camera_mode="mid_50",
                 brick_search_mode="fine",
                 V_visualize_capture=False,
-                V_visualize_search=True
+                V_visualize_search=False
             )
 
             if result["success"]:
@@ -45,7 +45,7 @@ class VisionNode(Node):
                 response.x = float(result["x_mm"] / 1000.0)
                 response.y = float(result["y_mm"] / 1000.0)
                 response.z = float(result["z_mm"] / 1000.0)
-                response.yaw = float(result["yaw_deg"+ 90])
+                response.yaw = float(result["yaw_deg"] + 90.0)
                 response.class_name = str(result["class_name"])
 
                 self.get_logger().info(

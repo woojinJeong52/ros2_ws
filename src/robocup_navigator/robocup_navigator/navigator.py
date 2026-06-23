@@ -62,7 +62,7 @@ class RobocupNavigator(Node):
         )
 
         self.declare_parameter('follow_waypoints_action_name',
-                               'follow_waypoints')
+                                'follow_waypoints')
         self.declare_parameter('follow_waypoints_server_timeout_sec', 10.0)
         self.declare_parameter('nav_result_timeout_sec', 120.0)
 
