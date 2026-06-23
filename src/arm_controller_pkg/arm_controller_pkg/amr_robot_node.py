@@ -242,7 +242,7 @@ class AmrRobotNode(Node):
             req = GetTargetPose.Request()
             req.target_color = target_color
             req.target_size = ""
-            res = self.call_service(self.vision_client, req)
+            res = self.call_service(self.vision_client, req, timeout=30)
             if res and res.success:
                 return res
             self.get_logger().warn(f'[AMR] vision retry {i + 1}/{retries}')

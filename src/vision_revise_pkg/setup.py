@@ -1,0 +1,36 @@
+import os
+from setuptools import find_packages, setup
+
+package_name = 'vision_revise_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/vision_debug.launch.py']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='dsp',
+    maintainer_email='dsp@todo.todo',
+    description='Revised vision package with improved debugging and runtime behavior',
+    license='Apache-2.0',
+    extras_require={
+        'test': ['pytest'],
+    },
+    entry_points={
+        'console_scripts': [
+            'vision_node = vision_revise_pkg.vision_node:main',
+        ],
+    },
+    package_data={
+        package_name: [
+            'yolo_models/Block_m_ver1.0/Block_s_ver1.0/best.pt',
+            'yolo_models/Component_Model_ver1.0/Model_s_ver2.0/best.pt'
+                       ],
+    },
+)
