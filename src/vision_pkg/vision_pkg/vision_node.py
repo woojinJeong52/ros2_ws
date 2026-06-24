@@ -13,10 +13,6 @@ class VisionNode(Node):
         self.vision = ivc.VisionManager()
         self.get_logger().info('[VISION] vision_node 시작 완료 (INUVisionLib 기반)')
 
-    def destroy_node(self):
-        if hasattr(self, 'vision') and self.vision is not None:
-            self.vision.close()
-        super().destroy_node()
 
     def get_pose_cb(self, request, response):
         target_str = request.target_color.strip()
@@ -92,3 +88,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+

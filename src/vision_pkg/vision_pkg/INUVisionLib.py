@@ -4,7 +4,6 @@ import pprint
 import glob
 import cv2
 import math
-import time
 
 import torch
 import open3d as o3d
@@ -20,8 +19,6 @@ import copy
 
 from scipy.spatial.transform import Rotation as R
 SCIPY_AVAILABLE = True
-
-_YOLO_MODEL_CACHE = {}
 
 CAMERA_PROFILES = {
     # 1. 바닥(Floor) 모드: RANSAC 평면 검출용 (넓고 강하게)
@@ -229,42 +226,6 @@ def get_realsense_ids():
         
     return connected_devices
 
-def load_yolo_model(model_path):
-    model_path = os.path.abspath(model_path)
-
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"YOLO model not found: {model_path}")
-
-    model = _YOLO_MODEL_CACHE.get(model_path)
-    if model is None:
-        t0 = time.perf_counter()
-        print(f"[PERF] YOLO 모델 로드 시작: {model_path}")
-        model = YOLO(model_path)
-        _YOLO_MODEL_CACHE[model_path] = model
-        print(f"[PERF] YOLO 모델 로드 완료: {time.perf_counter() - t0:.3f}s")
-
-    return model
-
-def warmup_yolo_model(model, imgsz=640, device=None, target_classes=None, conf=None, iou=None):
-    dummy = np.zeros((480, 640, 3), dtype=np.uint8)
-    kwargs = {
-        "imgsz": imgsz,
-        "verbose": False,
-    }
-
-    if device is not None:
-        kwargs["device"] = device
-    if target_classes is not None:
-        kwargs["classes"] = target_classes
-    if conf is not None:
-        kwargs["conf"] = conf
-    if iou is not None:
-        kwargs["iou"] = iou
-
-    t0 = time.perf_counter()
-    model(dummy, **kwargs)
-    print(f"[PERF] YOLO 워밍업 완료: {time.perf_counter() - t0:.3f}s")
-
 def configure_realsense(
         serial_number=None,
         preset_id=4, 
@@ -397,164 +358,6 @@ def configure_realsense(
 
     # 리턴 값에 thres_filter 추가!
     return pipeline, align, temp_filter, thres_filter
-
-def make_depth_colormap_meters(
-    depth_img,
-    depth_scale,
-    min_m=0.08,
-    max_m=0.35,
-    colormap=cv2.COLORMAP_JET
-):
-    """
-    raw depth가 아니라 meter 값 기준으로 컬러맵 생성.
-    depth_units가 0.00001이든 0.0001이든 시각화가 일관됨.
-    """
-    depth_m = depth_img.astype(np.float32) * float(depth_scale)
-
-    valid = (depth_m > min_m) & (depth_m < max_m)
-
-    depth_norm = np.zeros_like(depth_img, dtype=np.uint8)
-
-    if np.count_nonzero(valid) > 0:
-        clipped = np.clip(depth_m, min_m, max_m)
-        depth_norm[valid] = (
-            (clipped[valid] - min_m) / (max_m - min_m) * 255.0
-        ).astype(np.uint8)
-
-    depth_colormap = cv2.applyColorMap(depth_norm, colormap)
-    depth_colormap_rgb = cv2.cvtColor(depth_colormap, cv2.COLOR_BGR2RGB)
-
-    # invalid는 검정
-    depth_colormap_rgb[~valid] = 0
-
-    return depth_colormap_rgb, depth_m
-
-def visualize_capture_result(mode, color_img, depth_img, depth_scale):
-    if depth_img is None or color_img is None:
-        return
-
-    vis_ranges = {
-        "macro_30": (0.08, 0.35),
-        "mid_50": (0.15, 0.80),
-        "floor": (0.20, 3.00)
-    }
-    vis_min_m, vis_max_m = vis_ranges.get(mode, (0.20, 1.00))
-
-    depth_colormap_rgb, _ = make_depth_colormap_meters(
-        depth_img=depth_img,
-        depth_scale=depth_scale,
-        min_m=vis_min_m,
-        max_m=vis_max_m
-    )
-
-    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-    images = np.hstack((color_img, depth_colormap_rgb))
-    ax.imshow(images)
-    ax.axis("off")
-    ax.set_title(f"Capture Result | Mode: {mode} | Scale: {depth_scale:.6f}")
-    plt.show()
-
-class RealsenseCaptureSession:
-    def __init__(
-        self,
-        serial_number,
-        mode="mid_50",
-        initial_warmup_frames=10,
-        visualize=False
-    ):
-        self.serial_number = serial_number
-        self.mode = mode
-        self.initial_warmup_frames = initial_warmup_frames
-        self.visualize = visualize
-
-        self.pipeline = None
-        self.align = None
-        self.temp_filter = None
-        self.thres_filter = None
-        self.intrinsics = None
-        self.profile_depth_units = None
-        self.profile_params = None
-
-    def start(self):
-        if self.pipeline is not None:
-            return
-
-        self.profile_params = CAMERA_PROFILES.get(self.mode)
-        if self.profile_params is None:
-            raise ValueError(f"지원하지 않는 모드입니다: {self.mode}")
-
-        self.profile_depth_units = self.profile_params.get("depth_Units", None)
-
-        t0 = time.perf_counter()
-        print(f"[{self.mode}] RealSense 세션 시작(ID: {self.serial_number})")
-        self.pipeline, self.align, self.temp_filter, self.thres_filter = configure_realsense(
-            serial_number=self.serial_number,
-            **self.profile_params,
-            visualize=self.visualize
-        )
-        self.intrinsics = get_aligned_intrinsics(self.pipeline)
-
-        if self.initial_warmup_frames > 0:
-            print(f"[INFO] 센서 초기 안정화 중... ({self.initial_warmup_frames} 프레임)")
-            for _ in range(self.initial_warmup_frames):
-                self.pipeline.wait_for_frames()
-
-        print(f"[PERF] RealSense 세션 준비 완료: {time.perf_counter() - t0:.3f}s")
-
-    def _make_capture_temporal_filter(self):
-        temp_filter = rs.temporal_filter()
-        temp_filter.set_option(
-            rs.option.filter_smooth_alpha,
-            self.profile_params.get("smooth_alpha", 0.5)
-        )
-        temp_filter.set_option(
-            rs.option.filter_smooth_delta,
-            self.profile_params.get("smooth_delta", 50)
-        )
-        return temp_filter
-
-    def capture(self, warmup_frames=0, visualize=None):
-        self.start()
-
-        if visualize is None:
-            visualize = self.visualize
-
-        t0 = time.perf_counter()
-
-        if warmup_frames > 0:
-            for _ in range(warmup_frames):
-                self.pipeline.wait_for_frames()
-
-        depth_img, color_img, depth_scale, debug_info = get_aligned_frames_with_units(
-            pipeline=self.pipeline,
-            align=self.align,
-            temp_filter=self._make_capture_temporal_filter(),
-            thres_filter=self.thres_filter,
-            profile_depth_units=self.profile_depth_units,
-            apply_filter=True
-        )
-
-        if visualize:
-            visualize_capture_result(self.mode, color_img, depth_img, depth_scale)
-
-        print(f"[PERF] RealSense 프레임 캡처: {time.perf_counter() - t0:.3f}s")
-
-        return color_img, depth_img, self.intrinsics, depth_scale
-
-    def stop(self):
-        if self.pipeline is None:
-            return
-
-        try:
-            self.pipeline.stop()
-            print("[INFO] RealSense 세션 종료 완료.")
-        finally:
-            self.pipeline = None
-            self.align = None
-            self.temp_filter = None
-            self.thres_filter = None
-            self.intrinsics = None
-            self.profile_params = None
 
 # 컨트롤 실행부 함수들
 def capture_realsense_data(serial_number, mode="mid_50", warmup_frames=10, visualize=False):
@@ -5191,7 +4994,7 @@ def fine_correct(final_obj_fine,
 
     return fine_pose_table, fine_class_index
 
-def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visualize=True, yolo_model=None):
+def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visualize=True):
 
     if mode in ["coarse", "fine"]:
         pass
@@ -5215,11 +5018,10 @@ def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visuali
         print("[DEBUG] MODEL_PATH:", MODEL_PATH)
         print("[DEBUG] MODEL_EXISTS:", os.path.exists(MODEL_PATH))
 
-    if yolo_model is None:
-        model = load_yolo_model(MODEL_PATH)
-    else:
-        model = yolo_model
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"YOLO model not found: {MODEL_PATH}")
 
+    model = YOLO(MODEL_PATH)
     target_classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     results, mask_binary, vis_yolo = detect_objects_yolo(
@@ -5590,7 +5392,8 @@ def search_assembly(
     # 1. YOLO 모델 준비
     # ------------------------------------------------------------
     if yolo_model is None:
-        yolo_model = load_yolo_model(yolo_dir)
+        from ultralytics import YOLO
+        yolo_model = YOLO(yolo_dir)
 
     # ultralytics 입력은 BGR도 가능하지만, 기존 OpenCV 흐름에 맞춰 BGR 사용
     color_img_bgr = cv2.cvtColor(color_img_rgb, cv2.COLOR_RGB2BGR)

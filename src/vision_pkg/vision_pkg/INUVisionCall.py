@@ -1,5 +1,4 @@
 import os
-import time
 from vision_pkg import INUVisionLib as ivl
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,9 +14,6 @@ class VisionManager:
         self.class_index = None
 
         self.target = None
-        self._camera_serial = None
-        self._camera_session = None
-        self._yolo_models = {}
 
         self.yolo_dir_component = os.path.join(_PKG_DIR, 'yolo_models', 'Component_Model_ver1.0', 'Model_s_ver2.0', 'best.pt')
         self.yolo_dir_brick = os.path.join(_PKG_DIR, 'yolo_models', 'Block_m_ver1.0', 'Block_s_ver1.0', 'best.pt')
@@ -47,72 +43,20 @@ class VisionManager:
             48132: "icecream"
         }
 
-    def _ensure_yolo_models(self):
-        if "brick" in self._yolo_models and "component" in self._yolo_models:
-            return
 
-        self._yolo_models["brick"] = ivl.load_yolo_model(self.yolo_dir_brick)
-        self._yolo_models["component"] = ivl.load_yolo_model(self.yolo_dir_component)
-        try:
-            ivl.warmup_yolo_model(
-                self._yolo_models["brick"],
-                imgsz=640,
-                target_classes=[0, 1, 2, 3, 4, 5, 6, 7, 8]
-            )
-        except Exception as e:
-            print(f"[WARN] brick YOLO 워밍업 실패, 첫 추론에서 재시도됩니다: {e}")
-
-        try:
-            ivl.warmup_yolo_model(
-                self._yolo_models["component"],
-                imgsz=640,
-                device=0,
-                conf=0.7,
-                iou=0.3
-            )
-        except Exception as e:
-            print(f"[WARN] component YOLO 워밍업 실패, 첫 추론에서 재시도됩니다: {e}")
-
-    def _get_camera_serial(self):
-        if self._camera_serial is not None:
-            return self._camera_serial
+    def capture_camera(self, mode="mid_50", V_visualize=False):
 
         devices = ivl.get_realsense_ids()
 
         if len(devices) == 0:
             raise RuntimeError("연결된 RealSense 카메라가 없습니다.")
-
-        self._camera_serial = list(devices.keys())[0]
-        return self._camera_serial
-
-    def prepare_camera(self, mode="mid_50", V_visualize=False):
-        target_serial = self._get_camera_serial()
-
-        if (
-            self._camera_session is not None and
-            self._camera_session.serial_number == target_serial and
-            self._camera_session.mode == mode
-        ):
-            return self._camera_session
-
-        if self._camera_session is not None:
-            self._camera_session.stop()
-
-        self._camera_session = ivl.RealsenseCaptureSession(
-            serial_number=target_serial,
-            mode=mode,
-            initial_warmup_frames=10,
-            visualize=V_visualize
-        )
-        self._camera_session.start()
-        return self._camera_session
-
-    def capture_camera(self, mode="mid_50", V_visualize=False):
-        session = self.prepare_camera(mode=mode, V_visualize=V_visualize)
+        target_serial = list(devices.keys())[0]
 
         # 캡처한 데이터를 클래스 내부 보관함(self)에 저장
         print("[INFO] 카메라 데이터 캡처 중...")
-        self.color_rgb, self.depth, self.intrinsics, self.scale = session.capture(
+        self.color_rgb, self.depth, self.intrinsics, self.scale = ivl.capture_realsense_data(
+            serial_number=target_serial, 
+            mode=mode, 
             warmup_frames=10,
             visualize=V_visualize
         )
@@ -123,16 +67,13 @@ class VisionManager:
         if self.color_rgb is None:
             raise RuntimeError("카메라 데이터가 없습니다. 먼저 capture_camera()를 실행하세요.")
 
-        self._ensure_yolo_models()
-
         self.pose_table, self.class_index = ivl.search_bricks(mode, 
                                                             self.yolo_dir_brick, 
                                                             self.color_rgb, 
                                                             self.depth, 
                                                             self.intrinsics, 
                                                             self.scale, 
-                                                            V_visualize=V_visualize,
-                                                            yolo_model=self._yolo_models["brick"]
+                                                            V_visualize=V_visualize
                                                             )
 
         return self.pose_table, self.class_index
@@ -144,13 +85,11 @@ class VisionManager:
         if self.color_rgb is None:
             raise RuntimeError("카메라 데이터가 없습니다. 먼저 capture_camera()를 실행하세요.")
 
-        self._ensure_yolo_models()
-
         self.pose_table, self.class_index = ivl.search_assembly(self.color_rgb,
                                                                 self.depth,
                                                                 self.intrinsics,
                                                                 self.scale,
-                                                                yolo_model=self._yolo_models["component"],
+                                                                yolo_model=None,
                                                                 yolo_dir=self.yolo_dir_component,
                                                                 V_visualize=V_visualize,
 
@@ -173,11 +112,6 @@ class VisionManager:
                                                             )
 
         return self.pose_table, self.class_index
-
-    def close(self):
-        if self._camera_session is not None:
-            self._camera_session.stop()
-            self._camera_session = None
 
     def get_pose_by_id(self, target_id, local_id=0):
         """
@@ -275,8 +209,6 @@ class VisionManager:
             }
         """
 
-        total_t0 = time.perf_counter()
-
         # ------------------------------------------------------------
         # 0. ID 그룹 정의
         # ------------------------------------------------------------
@@ -337,12 +269,10 @@ class VisionManager:
             mode=camera_mode,
             V_visualize=V_visualize_capture
         )
-        capture_dt = time.perf_counter() - total_t0
 
         # ------------------------------------------------------------
         # 4. ID 그룹에 따라 Search 분기
         # ------------------------------------------------------------
-        search_t0 = time.perf_counter()
         if target_id in BRICK_IDS:
             print(f"[VISION] 일반 브릭 탐색 실행: ID={target_id}, class={target_class_name}")
 
@@ -367,24 +297,17 @@ class VisionManager:
                 "class_name": target_class_name,
                 "reason": "탐색 분기 미지정 ID"
             }
-        search_dt = time.perf_counter() - search_t0
 
         # ------------------------------------------------------------
         # 5. Search 결과에서 pose 추출
         # ------------------------------------------------------------
-        pose_t0 = time.perf_counter()
         X, Y, Z, YAW = self.get_pose_by_id(
             target_id=target_id,
             local_id=local_id
         )
-        pose_dt = time.perf_counter() - pose_t0
 
         if X is None or Y is None or Z is None or YAW is None:
             print(f"[WARNING] 시야에서 타겟을 찾지 못했습니다: ID={target_id}, class={target_class_name}")
-            print(
-                f"[PERF] pipeline total={time.perf_counter() - total_t0:.3f}s, "
-                f"capture={capture_dt:.3f}s, search={search_dt:.3f}s, pose={pose_dt:.3f}s"
-            )
 
             return {
                 "success": False,
@@ -410,10 +333,6 @@ class VisionManager:
         print(
             f"  ID={target_id}, class={target_class_name}, "
             f"X={X:.1f}mm, Y={Y:.1f}mm, Z={Z:.1f}mm, Yaw={YAW:.2f}deg"
-        )
-        print(
-            f"[PERF] pipeline total={time.perf_counter() - total_t0:.3f}s, "
-            f"capture={capture_dt:.3f}s, search={search_dt:.3f}s, pose={pose_dt:.3f}s"
         )
 
         return result
