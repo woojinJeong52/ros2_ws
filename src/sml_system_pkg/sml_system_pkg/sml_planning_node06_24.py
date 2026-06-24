@@ -1,5 +1,5 @@
 """
-sml_planning_node.py
+sml_planning_node06_24.py
 
 Task.msg를 수신해서 시간 비용 기반으로 작업 순서를 결정하고,
 depends_on 기반 Step 시퀀스를 생성한 뒤 ManagerNode 요청 시 전달하는 노드.
@@ -213,41 +213,6 @@ class PlanningNode(Node):
     # Step 1: JSON 좌표 로딩
     # --------------------------------------------------------
 
-    def _resolve_station_coord_json_path(self, path_str):
-        """
-        station_coord_json_path 파라미터를 실제 파일 경로로 변환한다.
-
-        규칙:
-        1. 절대 경로면 그대로 사용
-        2. 상대 경로면 ROS2 package share directory 기준으로 해석
-           예:
-           config/station_coordinates_a_zone.json
-           ->
-           install/sml_system_pkg/share/sml_system_pkg/config/station_coordinates_a_zone.json
-        3. package share directory를 찾지 못하면 source tree 기준 fallback 사용
-        """
-
-        path = Path(path_str).expanduser()
-
-        if path.is_absolute():
-            return path.resolve()
-
-        try:
-            package_share_dir = Path(get_package_share_directory(PACKAGE_NAME))
-            return (package_share_dir / path).resolve()
-
-        except Exception as e:
-            fallback_root = Path(__file__).resolve().parents[1]
-            fallback_path = (fallback_root / path).resolve()
-
-            self.get_logger().warn(
-                f'ament package share 경로를 찾지 못했습니다. '
-                f'source tree 기준 fallback을 사용합니다. '
-                f'error={e}, fallback_path={fallback_path}'
-            )
-
-            return fallback_path
-
     def _load_station_coord_json(self):
         path_str = self.get_parameter(
             STATION_COORD_JSON_PARAM
@@ -260,7 +225,30 @@ class PlanningNode(Node):
             )
             return {}
 
-        path = self._resolve_station_coord_json_path(path_str)
+        path = Path(path_str).expanduser()
+
+        # 상대 경로면 ROS2 package share directory 기준으로 해석
+        # 예:
+        #   config/station_coordinates_a_zone.json
+        #   -> install/sml_system_pkg/share/sml_system_pkg/config/station_coordinates_a_zone.json
+        if not path.is_absolute():
+            try:
+                package_share_dir = Path(get_package_share_directory(PACKAGE_NAME))
+                path = package_share_dir / path
+            except Exception as e:
+                # ros2 run이 아닌 직접 python 실행 상황을 위한 fallback
+                # source tree 구조:
+                #   src/sml_system_pkg/sml_system_pkg/sml_planning_node06_24.py
+                #   src/sml_system_pkg/config/station_coordinates_a_zone.json
+                fallback_root = Path(__file__).resolve().parents[1]
+                path = fallback_root / path
+                self.get_logger().warn(
+                    f'ament package share 경로를 찾지 못했습니다. '
+                    f'source tree 기준 fallback을 사용합니다. '
+                    f'error={e}'
+                )
+
+        path = path.resolve()
 
         if not path.exists():
             self.get_logger().warn(
