@@ -449,3 +449,16 @@ ros2 run sml_system_pkg sml_planning_node
 ros2 run sml_system_pkg sml_manager_node
 
 ros2 run sml_system_pkg order_server
+
+## Mockup test
+ros2 run sml_system_pkg mock_nav_node
+
+ros2 run sml_system_pkg mock_arm_node
+
+ros2 run sml_system_pkg mock_wb_node
+
+ros2 run sml_system_pkg sml_planning_node
+
+ros2 run sml_system_pkg sml_manager_node
+
+ros2 run sml_system_pkg order_server
