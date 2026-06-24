@@ -53,8 +53,11 @@ class SmlManagerNode(Node):
         )
 
         # ── Subscriber ─────────────────────────────────────
+        self.declare_parameter('task_topic', '/sml/task')
+        task_topic = self.get_parameter('task_topic').value
+
         self.task_sub = self.create_subscription(
-            Task, '/sml/task',
+            Task, task_topic,
             self.task_callback, 10,
             callback_group=self.cbg)
 
@@ -82,7 +85,7 @@ class SmlManagerNode(Node):
         self.status_pub = self.create_publisher(
             String, '/sml/status', 10)
 
-        self.get_logger().info('[MANAGER] sml_manager_node 시작')
+        self.get_logger().info(f'[MANAGER] sml_manager_node 시작 | task_topic={task_topic}')
 
     # ──────────────────────────────────────────────────────
     # Task 수신 → GetPlan 요청
