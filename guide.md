@@ -444,6 +444,8 @@ ros2 run sml_system_pkg mock_wb_node
 
 ros2 run sml_system_pkg sml_planning_node
 
+> (0624 update)ros2 run sml_system_pkg sml_planning_node
+
 ros2 run sml_system_pkg sml_manager_node
 
 ros2 run sml_system_pkg order_server
