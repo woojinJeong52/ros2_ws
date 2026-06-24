@@ -11,12 +11,6 @@ class VisionNode(Node):
         self.get_logger().info('[VISION] 초기화 중... VisionManager 로드')
         
         self.vision = ivc.VisionManager()
-        try:
-            self.vision.prepare_camera(mode="mid_50", V_visualize=False)
-            self.get_logger().info('[VISION] RealSense 카메라 세션 준비 완료')
-        except Exception as e:
-            self.get_logger().warning(f'[VISION] 카메라 사전 준비 실패, 첫 요청에서 재시도합니다: {e}')
-
         self.get_logger().info('[VISION] vision_node 시작 완료 (INUVisionLib 기반)')
 
     def destroy_node(self):
@@ -98,4 +92,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-

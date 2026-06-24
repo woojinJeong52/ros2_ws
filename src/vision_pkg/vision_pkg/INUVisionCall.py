@@ -47,9 +47,10 @@ class VisionManager:
             48132: "icecream"
         }
 
-        self._preload_yolo_models()
+    def _ensure_yolo_models(self):
+        if "brick" in self._yolo_models and "component" in self._yolo_models:
+            return
 
-    def _preload_yolo_models(self):
         self._yolo_models["brick"] = ivl.load_yolo_model(self.yolo_dir_brick)
         self._yolo_models["component"] = ivl.load_yolo_model(self.yolo_dir_component)
         try:
@@ -122,6 +123,8 @@ class VisionManager:
         if self.color_rgb is None:
             raise RuntimeError("카메라 데이터가 없습니다. 먼저 capture_camera()를 실행하세요.")
 
+        self._ensure_yolo_models()
+
         self.pose_table, self.class_index = ivl.search_bricks(mode, 
                                                             self.yolo_dir_brick, 
                                                             self.color_rgb, 
@@ -140,6 +143,8 @@ class VisionManager:
 
         if self.color_rgb is None:
             raise RuntimeError("카메라 데이터가 없습니다. 먼저 capture_camera()를 실행하세요.")
+
+        self._ensure_yolo_models()
 
         self.pose_table, self.class_index = ivl.search_assembly(self.color_rgb,
                                                                 self.depth,
