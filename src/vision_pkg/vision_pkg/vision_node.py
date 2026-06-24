@@ -15,7 +15,7 @@ class VisionNode(Node):
 
 
     def get_pose_cb(self, request, response):
-        target_str = request.target_color.strip()
+        target_str = str(request.target_color).strip()
         self.get_logger().info(f'[VISION] 서비스 요청 수신 - target ID: {target_str}')
 
         try:
@@ -45,7 +45,7 @@ class VisionNode(Node):
                 response.x = float(result["x_mm"] / 1000.0)
                 response.y = float(result["y_mm"] / 1000.0)
                 response.z = float(result["z_mm"] / 1000.0)
-                response.yaw = float(result["yaw_deg"+ 90])
+                response.yaw = float(result["yaw_deg"] + 90.0)
                 response.class_name = str(result["class_name"])
 
                 self.get_logger().info(
