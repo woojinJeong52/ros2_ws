@@ -17,6 +17,7 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch/yaml_waypoint_follower.launch.py',
             'launch/yaml_autonomous_waypoint_follower.launch.py',
+            'launch/goal_pose_generator.launch.py',
         ]),
     ],
     install_requires=['setuptools'],
@@ -35,6 +36,7 @@ setup(
             'robocup_waypoint_node = amr_navigator.robocup_waypoint_follower:main',
             'waypoint_follower_client_3_12 = amr_navigator.waypoint_follower_client_3_12:main',
             'pose_to_waypoint = amr_navigator.pose_to_waypoint:main',
+            'goal_pose_generator = amr_navigator.goal_pose_generator:main',
         ],
     },
 )
