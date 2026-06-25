@@ -43,6 +43,27 @@ class VisionManager:
             48132: "icecream"
         }
 
+        # ----------------------------------------------------------------
+        # Pre-load YOLO models once at startup — eliminates 0.5–2 s
+        # disk read + GPU upload that previously happened on every call.
+        # ----------------------------------------------------------------
+        print("[VISION] YOLO 모델 사전 로딩 중 (brick) ...")
+        self.yolo_model_brick = ivl.YOLO(self.yolo_dir_brick)
+        print("[VISION] YOLO 모델 사전 로딩 중 (component) ...")
+        self.yolo_model_component = ivl.YOLO(self.yolo_dir_component)
+        print("[VISION] YOLO 모델 사전 로딩 완료.")
+
+        # ----------------------------------------------------------------
+        # Floor-plane cache: stores (plane_model, plane_normal) between
+        # calls so DBSCAN+RANSAC only runs when the scene changes.
+        # Call invalidate_floor_cache() after the robot/camera moves.
+        # ----------------------------------------------------------------
+        self._floor_plane_cache = None   # (plane_model, plane_normal) tuple
+
+    def invalidate_floor_cache(self):
+        """바닥 평면 캐시를 무효화합니다. 카메라/로봇이 이동한 후 호출하세요."""
+        self._floor_plane_cache = None
+        print("[VISION] 바닥 평면 캐시 초기화됨.")
 
     def capture_camera(self, mode="mid_50", V_visualize=False):
 
@@ -67,12 +88,14 @@ class VisionManager:
         if self.color_rgb is None:
             raise RuntimeError("카메라 데이터가 없습니다. 먼저 capture_camera()를 실행하세요.")
 
-        self.pose_table, self.class_index = ivl.search_bricks(mode, 
-                                                            self.yolo_dir_brick, 
-                                                            self.color_rgb, 
-                                                            self.depth, 
-                                                            self.intrinsics, 
-                                                            self.scale, 
+        self.pose_table, self.class_index = ivl.search_bricks(mode,
+                                                            self.yolo_dir_brick,
+                                                            self.color_rgb,
+                                                            self.depth,
+                                                            self.intrinsics,
+                                                            self.scale,
+                                                            yolo_model=self.yolo_model_brick,
+                                                            half=True,
                                                             V_visualize=V_visualize
                                                             )
 
@@ -89,7 +112,7 @@ class VisionManager:
                                                                 self.depth,
                                                                 self.intrinsics,
                                                                 self.scale,
-                                                                yolo_model=None,
+                                                                yolo_model=self.yolo_model_component,
                                                                 yolo_dir=self.yolo_dir_component,
                                                                 V_visualize=V_visualize,
 

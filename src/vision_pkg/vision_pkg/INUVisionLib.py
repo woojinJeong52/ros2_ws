@@ -1537,7 +1537,7 @@ def create_floor_anchored_3d_box(box_2d, intrinsics, plane_normal, d, max_h, col
 
 # 컨트롤 함수
 
-def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, visualize=False):
+def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, half=False, visualize=False):
     """
     YOLOv8 모델을 사용하여 특정 클래스에 대한 객체를 검출하고, 이진 마스크로 반환
     
@@ -1563,9 +1563,9 @@ def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, vis
     
     # 2. 모델 추론 (클래스 필터링 적용, 전체 해상도 마스크 반환)
     if target_classes is not None:
-        results = model(color_img_bgr, classes=target_classes, device=device, retina_masks=True, verbose=False)
+        results = model(color_img_bgr, classes=target_classes, device=device, half=half, retina_masks=True, verbose=False)
     else:
-        results = model(color_img_bgr, device=device, retina_masks=True, verbose=False)
+        results = model(color_img_bgr, device=device, half=half, retina_masks=True, verbose=False)
 
     # 3. 마스크 병합용 빈 도화지 생성
     mask_binary = np.zeros((img_height, img_width), dtype=np.uint8)
@@ -4997,7 +4997,7 @@ def fine_correct(final_obj_fine,
 
     return fine_pose_table, fine_class_index
 
-def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visualize=True):
+def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, yolo_model=None, half=True, V_visualize=True):
 
     if mode in ["coarse", "fine"]:
         pass
@@ -5015,23 +5015,26 @@ def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visuali
     # YOLO V8 세그멘테이션 기준 영역 잡기 + 겹침 전처리
     #======================================================================================
 
-    MODEL_PATH = os.path.join(yolo_dir)
+    if yolo_model is None:
+        MODEL_PATH = os.path.join(yolo_dir)
 
-    if V_visualize:
-        print("[DEBUG] MODEL_PATH:", MODEL_PATH)
-        print("[DEBUG] MODEL_EXISTS:", os.path.exists(MODEL_PATH))
+        if V_visualize:
+            print("[DEBUG] MODEL_PATH:", MODEL_PATH)
+            print("[DEBUG] MODEL_EXISTS:", os.path.exists(MODEL_PATH))
 
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"YOLO model not found: {MODEL_PATH}")
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(f"YOLO model not found: {MODEL_PATH}")
 
-    model = YOLO(MODEL_PATH)
+        yolo_model = YOLO(MODEL_PATH)
+
     target_classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     results, mask_binary, vis_yolo = detect_objects_yolo(
-        model=model,
+        model=yolo_model,
         color_img_bgr=color_img_bgr,
         target_classes=target_classes,
         device=0,
+        half=half,
         visualize=V_visualize
     )
 
@@ -5247,36 +5250,36 @@ def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visuali
             window_name="3D OBB + Object XYZ Axes"
         )
 
-    color_o3d = o3d.geometry.Image(color_rgb)
-    depth_o3d = o3d.geometry.Image(cv2.medianBlur(depth, 5))
-
-    o3d_intr = o3d.camera.PinholeCameraIntrinsic(
-        int(intrinsics.width),
-        int(intrinsics.height),
-        float(intrinsics.fx),
-        float(intrinsics.fy),
-        float(intrinsics.ppx),
-        float(intrinsics.ppy)
-    )
-
-    rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
-        color_o3d,
-        depth_o3d,
-        depth_scale=1.0 / float(scale),
-        depth_trunc=5.0,
-        convert_rgb_to_intensity=False
-    )
-
-    rgb_pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
-        rgbd_image,
-        o3d_intr
-    )
-
-    rgb_pcd = rgb_pcd.voxel_down_sample(voxel_size=0.0015)
-
-    final_overlay_elements = [rgb_pcd] + overlay_3d_with_axes
-
     if V_visualize:
+        color_o3d = o3d.geometry.Image(color_rgb)
+        depth_o3d = o3d.geometry.Image(cv2.medianBlur(depth, 5))
+
+        o3d_intr = o3d.camera.PinholeCameraIntrinsic(
+            int(intrinsics.width),
+            int(intrinsics.height),
+            float(intrinsics.fx),
+            float(intrinsics.fy),
+            float(intrinsics.ppx),
+            float(intrinsics.ppy)
+        )
+
+        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            color_o3d,
+            depth_o3d,
+            depth_scale=1.0 / float(scale),
+            depth_trunc=5.0,
+            convert_rgb_to_intensity=False
+        )
+
+        rgb_pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+            rgbd_image,
+            o3d_intr
+        )
+
+        rgb_pcd = rgb_pcd.voxel_down_sample(voxel_size=0.0015)
+
+        final_overlay_elements = [rgb_pcd] + overlay_3d_with_axes
+
         print("\n[INFO] RGB-D PointCloud + 3D OBB + Object Axes 표시")
         o3d.visualization.draw_geometries(
             final_overlay_elements,
