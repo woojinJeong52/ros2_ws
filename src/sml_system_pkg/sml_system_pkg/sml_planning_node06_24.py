@@ -5,8 +5,9 @@ ManagerNode 요청 시 전달하는 노드.
 
 반영된 규칙
 1. batch ID 해석
-   - 10,20,...,80은 각각 raw 1,2,...,8 두 개를 담은 batch로 취급한다.
-   - AMR LOAD/UNLOAD object_ids에는 raw로 풀지 않고 실제 batch ID를 넣는다.
+   - 10,20,...,80은 각각 raw 1,2,...,8을 BATCH_SIZE개 담은 batch로 취급한다.
+   - planner 내부 재고 계산에는 batch capacity를 사용한다.
+   - AMR LOAD/UNLOAD object_ids에는 batch ID가 아니라 raw ID로 분해해서 넣는다.
 
 2. RECYCLE source 규칙
    - Order.OT_RECYCLE product_id는 무조건 CUSTOMER station에 있다고 가정한다.
@@ -56,7 +57,7 @@ RAW_TO_BATCH = {
     8: 80,
 }
 BATCH_TO_RAW = {batch: raw for raw, batch in RAW_TO_BATCH.items()}
-BATCH_SIZE = 2
+BATCH_SIZE = 5
 
 # --------------------------------------------------------
 # 경기 / 시스템 시간 가정값
@@ -85,7 +86,7 @@ MAIN_WORKBENCH_STATION_ID = 5
 
 STATION_COORD_JSON_PARAM = 'station_coord_json_path'
 DEFAULT_STATION_COORD_JSON_PATH = (
-    '/home/vision/ros2_ws/src/sml_system_pkg/config/station_coordinates_a_zone.json'
+    '/home/user/ros2_ws/src/sml_system_pkg/config/station_coordinates_a_zone.json'
 )
 
 # 메시지에 OT_LIFECYCLE이 없을 수도 있으므로 3을 fallback으로 사용
@@ -498,8 +499,16 @@ class PlanningNode(Node):
         else:
             chosen = candidates[0]
 
+        # AMR/ARM에는 batch ID(10,20,...,80)를 그대로 보내지 않는다.
+        # batch token 하나가 여러 raw를 담고 있으면, 필요한 개수만큼 raw ID로 분해해서 보낸다.
+        # 예: object_id=40, BATCH_SIZE=5인 token에서 raw 4를 두 번 쓰면
+        #     AMR step object_ids에는 [4, 4]가 들어간다.
+        use_index = chosen['capacity'] - chosen['remaining']
         chosen['remaining'] -= 1
-        return chosen['station_id'], chosen['object_id'], chosen['ref']
+
+        amr_object_id = material
+        raw_token_ref = (chosen['ref'], use_index)
+        return chosen['station_id'], amr_object_id, raw_token_ref
 
     def _assign_waste_materials(
         self, recycle_orders, produce_orders, waste_target_tokens,
@@ -566,8 +575,13 @@ class PlanningNode(Node):
         else:
             chosen = candidates[0]
 
+        # Waste target도 batch ID가 아니라 실제 raw ID로 반납하도록 step을 만든다.
+        use_index = chosen['capacity'] - chosen['remaining']
         chosen['remaining'] -= 1
-        return chosen['station_id'], chosen['object_id'], chosen['ref']
+
+        amr_object_id = material
+        raw_token_ref = (chosen['ref'], use_index)
+        return chosen['station_id'], amr_object_id, raw_token_ref
 
     # --------------------------------------------------------
     # Step 3: WB 시퀀스 결정
@@ -1076,7 +1090,7 @@ class PlanningNode(Node):
         return step
 
     def _add_grouped_object(self, grouped, station_id, object_id, token_ref):
-        """같은 batch token은 한 번만 싣고, raw 중복은 서로 다른 token이면 중복 허용."""
+        """같은 raw 사용 token은 중복 방지하고, batch에서 분해된 raw 중복은 허용한다."""
         items = grouped.setdefault(station_id, [])
         refs = grouped.setdefault((station_id, '_refs'), set())
         if token_ref is not None:
