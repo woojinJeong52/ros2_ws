@@ -60,6 +60,83 @@ class VisionManager:
         # ----------------------------------------------------------------
         self._floor_plane_cache = None   # (plane_model, plane_normal) tuple
 
+        # ----------------------------------------------------------------
+        # Persistent RealSense pipeline — started once and reused across
+        # captures.  Eliminates ~3.3 s warmup + hardware init on every call.
+        # Re-initialised automatically when the camera mode changes.
+        # ----------------------------------------------------------------
+        self._rs_pipeline = None
+        self._rs_align = None
+        self._rs_temp_filter = None
+        self._rs_thres_filter = None
+        self._rs_depth_units = None
+        self._rs_mode = None
+        self._rs_serial = None
+
+    _RS_FRAME_TIMEOUT_MS = 5000  # wait_for_frames 최대 대기 시간 (ms)
+
+    def _ensure_pipeline(self, serial, mode):
+        """파이프라인이 없거나 모드/시리얼이 바뀌었을 때만 (재)시작합니다."""
+        if (self._rs_pipeline is not None
+                and self._rs_mode == mode
+                and self._rs_serial == serial):
+            return  # 이미 올바른 설정으로 동작 중
+
+        if self._rs_pipeline is not None:
+            print("[VISION] 카메라 모드 변경 — 파이프라인 재시작...")
+            try:
+                self._rs_pipeline.stop()
+            except Exception as e:
+                print(f"[VISION] 파이프라인 종료 중 경고 (무시): {e}")
+            self._rs_pipeline = None
+
+        profile_params = ivl.CAMERA_PROFILES.get(mode)
+        if profile_params is None:
+            raise ValueError(f"지원하지 않는 카메라 모드입니다: {mode}")
+
+        self._rs_depth_units = profile_params.get("depth_Units", None)
+
+        print(f"[VISION] RealSense 파이프라인 시작 (mode={mode}, serial={serial}) ...")
+        (self._rs_pipeline,
+         self._rs_align,
+         self._rs_temp_filter,
+         self._rs_thres_filter) = ivl.configure_realsense(
+            serial_number=serial,
+            **profile_params,
+            visualize=False
+        )
+        # configure_realsense 성공 이후에만 기록
+        self._rs_mode = mode
+        self._rs_serial = serial
+
+        print("[VISION] 센서 예열 중 (10 프레임)...")
+        for _ in range(10):
+            self._rs_pipeline.wait_for_frames(self._RS_FRAME_TIMEOUT_MS)
+        print("[VISION] 파이프라인 준비 완료.")
+
+    def _reset_pipeline(self):
+        """파이프라인을 안전하게 해제하고 상태를 초기화합니다."""
+        if self._rs_pipeline is not None:
+            try:
+                self._rs_pipeline.stop()
+            except Exception:
+                pass
+            self._rs_pipeline = None
+        self._rs_mode = None
+        self._rs_serial = None
+
+    def close(self):
+        """파이프라인을 명시적으로 종료합니다. 노드 셧다운 시 호출하세요."""
+        if not hasattr(self, '_rs_pipeline'):
+            return
+        if self._rs_pipeline is not None:
+            self._rs_pipeline.stop()
+            self._rs_pipeline = None
+            print("[VISION] RealSense 파이프라인 종료.")
+
+    def __del__(self):
+        self.close()
+
     def invalidate_floor_cache(self):
         """바닥 평면 캐시를 무효화합니다. 카메라/로봇이 이동한 후 호출하세요."""
         self._floor_plane_cache = None
@@ -73,14 +150,36 @@ class VisionManager:
             raise RuntimeError("연결된 RealSense 카메라가 없습니다.")
         target_serial = list(devices.keys())[0]
 
-        # 캡처한 데이터를 클래스 내부 보관함(self)에 저장
+        # 파이프라인이 없거나 모드가 바뀌었을 때만 (재)초기화
+        self._ensure_pipeline(target_serial, mode)
+
+        # 프레임 1장만 캡처 — warmup/init 없음
         print("[INFO] 카메라 데이터 캡처 중...")
-        self.color_rgb, self.depth, self.intrinsics, self.scale = ivl.capture_realsense_data(
-            serial_number=target_serial, 
-            mode=mode, 
-            warmup_frames=10,
-            visualize=V_visualize
-        )
+        try:
+            self.depth, self.color_rgb, self.scale, _ = ivl.get_aligned_frames_with_units(
+                pipeline=self._rs_pipeline,
+                align=self._rs_align,
+                temp_filter=self._rs_temp_filter,
+                thres_filter=self._rs_thres_filter,
+                profile_depth_units=self._rs_depth_units,
+                apply_filter=True
+            )
+            self.intrinsics = ivl.get_aligned_intrinsics(self._rs_pipeline)
+        except Exception as e:
+            # 카메라 연결 끊김 등 하드웨어 오류 — 파이프라인을 리셋하여
+            # 다음 호출 시 재초기화가 자동으로 이루어지도록 합니다.
+            print(f"[VISION] 프레임 캡처 중 하드웨어 오류 — 파이프라인 리셋: {e}")
+            self._reset_pipeline()
+            raise RuntimeError(f"카메라 프레임 캡처 실패: {e}") from e
+
+        if self.color_rgb is None or self.depth is None:
+            # 프레임은 받았지만 정렬 결과가 None인 경우 (드문 케이스)
+            self._reset_pipeline()
+            raise RuntimeError("프레임 캡처 실패: color 또는 depth가 None입니다. 파이프라인을 리셋했습니다.")
+
+        if V_visualize:
+            ivl.visualize_capture(self.color_rgb, self.depth, self.scale, mode)
+
         return self.color_rgb, self.depth, self.intrinsics, self.scale
 
     def run_search(self, mode, V_visualize=False):
