@@ -43,6 +43,39 @@ class VisionManager:
             48132: "icecream"
         }
 
+    @staticmethod
+    def _normalize_class_name(name):
+        return str(name).lower().replace(" ", "")
+
+    @staticmethod
+    def _same_color_size_fallback(name):
+        if name.startswith("4x2_"):
+            return name.replace("4x2_", "2x2_", 1)
+        if name.startswith("2x2_"):
+            return name.replace("2x2_", "4x2_", 1)
+        return None
+
+    def _find_class_index_key(self, target_class_name):
+        if self.class_index is None:
+            return None, None
+
+        normalized_target = self._normalize_class_name(target_class_name)
+
+        for key in self.class_index.keys():
+            if self._normalize_class_name(key) == normalized_target:
+                return key, None
+
+        fallback_class_name = self._same_color_size_fallback(target_class_name)
+        if fallback_class_name is None:
+            return None, None
+
+        normalized_fallback = self._normalize_class_name(fallback_class_name)
+        for key in self.class_index.keys():
+            if self._normalize_class_name(key) == normalized_fallback:
+                return key, fallback_class_name
+
+        return None, None
+
 
     def capture_camera(self, mode="mid_50", V_visualize=False):
 
@@ -152,16 +185,18 @@ class VisionManager:
         #    YOLO 모델 클래스명과 대소문자가 다를 수 있으므로
         #    소문자로 변환하여 매칭
         # ------------------------------------------------------------
-        matched_key = None
-        for key in self.class_index.keys():
-            if key.lower().replace(" ", "") == target_class_name.lower().replace(" ", ""):
-                matched_key = key
-                break
+        matched_key, fallback_class_name = self._find_class_index_key(target_class_name)
 
         if matched_key is None:
             print(f"🚨 시야에 [{target_class_name}] 블록이 없습니다.")
             print(f"👉 현재 감지된 클래스 목록: {list(self.class_index.keys())}")
             return None, None, None, None
+
+        if fallback_class_name is not None:
+            print(
+                f"[WARNING] 요청 클래스 [{target_class_name}]가 없어 "
+                f"같은 색상 후보 [{matched_key}]로 대체합니다."
+            )
 
         X, Y, Z, YAW = ivl.get_target_grasp_pose(
             self.class_index,
