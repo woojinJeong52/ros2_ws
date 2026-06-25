@@ -593,6 +593,32 @@ def get_aligned_frames_with_units(
     return depth_image, color_image, depth_scale_used, debug_info
 
 
+def visualize_capture(color_rgb, depth_img, depth_scale, mode="mid_50"):
+    """capture_camera(V_visualize=True) 호출 시 컬러+뎁스 시각화."""
+    vis_ranges = {
+        "macro_30": (0.08, 0.35),
+        "mid_50":   (0.15, 0.80),
+        "floor":    (0.20, 3.00),
+    }
+    min_m, max_m = vis_ranges.get(mode, (0.20, 1.00))
+
+    depth_m = depth_img.astype(np.float32) * float(depth_scale)
+    valid = (depth_m > min_m) & (depth_m < max_m)
+    depth_norm = np.zeros_like(depth_img, dtype=np.uint8)
+    if np.count_nonzero(valid) > 0:
+        clipped = np.clip(depth_m, min_m, max_m)
+        depth_norm[valid] = ((clipped[valid] - min_m) / (max_m - min_m) * 255.0).astype(np.uint8)
+    depth_colormap = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
+    depth_colormap_rgb = cv2.cvtColor(depth_colormap, cv2.COLOR_BGR2RGB)
+    depth_colormap_rgb[~valid] = 0
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+    ax.imshow(np.hstack((color_rgb, depth_colormap_rgb)))
+    ax.axis("off")
+    ax.set_title(f"Capture Result | Mode: {mode} | Scale: {depth_scale:.6f}")
+    plt.show()
+
+
 # 조립체 분석용 함수들
 
 def depth_to_xyz_map(depth_img, depth_scale, intrinsics):
