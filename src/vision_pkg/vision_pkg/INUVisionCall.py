@@ -100,6 +100,7 @@ class VisionManager:
                                                                 iou_thres=0.3,
                                                                 imgsz=640,
                                                                 device=0,
+                                                                half=True,
 
                                                                 # mask 후처리
                                                                 yolo_mask_thresh=0.5,

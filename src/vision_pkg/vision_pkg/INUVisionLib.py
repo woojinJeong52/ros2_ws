@@ -1538,7 +1538,7 @@ def create_floor_anchored_3d_box(box_2d, intrinsics, plane_normal, d, max_h, col
 
 # 컨트롤 함수
 
-def detect_objects_yolo(model, color_img_bgr, target_classes=None, visualize=False):
+def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, visualize=False):
     """
     YOLOv8 모델을 사용하여 특정 클래스에 대한 객체를 검출하고, 이진 마스크로 반환
     
@@ -1547,6 +1547,8 @@ def detect_objects_yolo(model, color_img_bgr, target_classes=None, visualize=Fal
         color_img_bgr (ndarray): 모델 입력용 원본 BGR 이미지
         target_classes (list, optional): 검출할 클래스 ID 리스트. (예: [0, 1, 3, 4, 5, 6, 8, 9])
                                          None일 경우 모든 클래스를 검출합니다.
+        device (int or str): 추론 장치. 0(또는 양수 정수)이면 GPU, 'cpu'이면 CPU 사용.
+                             기본값 0 (GPU 0).
         visualize (bool): 추론 결과(YOLO plot)를 Matplotlib으로 시각화할지 여부
         
     Returns:
@@ -1560,9 +1562,9 @@ def detect_objects_yolo(model, color_img_bgr, target_classes=None, visualize=Fal
     
     # 2. 모델 추론 (클래스 필터링 적용)
     if target_classes is not None:
-        results = model(color_img_bgr, classes=target_classes, verbose=False)
+        results = model(color_img_bgr, classes=target_classes, device=device, verbose=False)
     else:
-        results = model(color_img_bgr, verbose=False)
+        results = model(color_img_bgr, device=device, verbose=False)
 
     # 3. 마스크 병합용 빈 도화지 생성
     mask_binary = np.zeros((img_height, img_width), dtype=np.uint8)
@@ -5025,9 +5027,10 @@ def search_bricks(mode, yolo_dir, color_rgb, depth, intrinsics, scale, V_visuali
     target_classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     results, mask_binary, vis_yolo = detect_objects_yolo(
-        model= model, 
-        color_img_bgr=color_img_bgr, 
-        target_classes=target_classes, 
+        model=model,
+        color_img_bgr=color_img_bgr,
+        target_classes=target_classes,
+        device=0,
         visualize=V_visualize
     )
 
@@ -5330,6 +5333,7 @@ def search_assembly(
     iou_thres=0.3,
     imgsz=640,
     device=0,
+    half=False,
 
     # mask 후처리
     yolo_mask_thresh=0.5,
@@ -5406,6 +5410,7 @@ def search_assembly(
         iou=iou_thres,
         imgsz=imgsz,
         device=device,
+        half=half,
         verbose=False
     )
 
