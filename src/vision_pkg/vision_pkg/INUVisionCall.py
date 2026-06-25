@@ -1,4 +1,5 @@
 import os
+import time
 from vision_pkg import INUVisionLib as ivl
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -150,8 +151,16 @@ class VisionManager:
             raise RuntimeError("연결된 RealSense 카메라가 없습니다.")
         target_serial = list(devices.keys())[0]
 
-        # 파이프라인이 없거나 모드가 바뀌었을 때만 (재)초기화
-        self._ensure_pipeline(target_serial, mode)
+        # 파이프라인이 없거나 모드가 바뀌었을 때만 (재)초기화.
+        # 초기화 자체 실패(예: USB autosuspend 후 power state 오류)는
+        # 리셋 후 1회 재시도한다.
+        try:
+            self._ensure_pipeline(target_serial, mode)
+        except Exception as e:
+            print(f"[VISION] 파이프라인 초기화 실패 ({e}) — 리셋 후 재시도...")
+            self._reset_pipeline()
+            time.sleep(1.0)
+            self._ensure_pipeline(target_serial, mode)  # 두 번째 실패는 그대로 전파
 
         # 프레임 1장만 캡처 — warmup/init 없음
         print("[INFO] 카메라 데이터 캡처 중...")

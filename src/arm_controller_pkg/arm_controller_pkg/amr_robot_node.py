@@ -289,6 +289,8 @@ class AmrRobotNode(Node):
             if res:
                 self.get_logger().info(
                     f'[AMR] vision success at y_offset={current_y_offset:.0f}mm')
+                if not self.return_scan_center(current_y_offset):
+                    self.get_logger().error('[AMR] failed to return scan center after success')
                 return res
 
         self.get_logger().warn('[AMR] vision scan failed at all y offsets')
