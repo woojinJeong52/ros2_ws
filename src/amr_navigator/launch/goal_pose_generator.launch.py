@@ -47,3 +47,4 @@ def generate_launch_description():
                 {'auto_station_blocks': ParameterValue(auto_station_blocks, value_type=bool)},
             ],
         ),
+    ])
