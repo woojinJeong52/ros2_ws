@@ -12,6 +12,8 @@ def generate_launch_description():
     name_prefix = LaunchConfiguration('name_prefix')
     lookup_timeout_sec = LaunchConfiguration('lookup_timeout_sec')
     float_precision = LaunchConfiguration('float_precision')
+    interactive = LaunchConfiguration('interactive')
+    allow_overwrite = LaunchConfiguration('allow_overwrite')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -24,6 +26,8 @@ def generate_launch_description():
         DeclareLaunchArgument('name_prefix', default_value='work_station'),
         DeclareLaunchArgument('lookup_timeout_sec', default_value='1.0'),
         DeclareLaunchArgument('float_precision', default_value='6'),
+        DeclareLaunchArgument('interactive', default_value='true'),
+        DeclareLaunchArgument('allow_overwrite', default_value='false'),
         Node(
             package='amr_navigator',
             executable='goal_pose_generator',
@@ -36,6 +40,8 @@ def generate_launch_description():
                 {'name_prefix': name_prefix},
                 {'lookup_timeout_sec': ParameterValue(lookup_timeout_sec, value_type=float)},
                 {'float_precision': ParameterValue(float_precision, value_type=int)},
+                {'interactive': ParameterValue(interactive, value_type=bool)},
+                {'allow_overwrite': ParameterValue(allow_overwrite, value_type=bool)},
             ],
         ),
     ])

@@ -1,6 +1,8 @@
 import os
 import re
+import sys
 import tempfile
+import threading
 from typing import Any, Dict
 
 import rclpy
@@ -23,9 +25,13 @@ class GoalPoseGenerator(Node):
         self.declare_parameter('name_prefix', 'work_station')
         self.declare_parameter('lookup_timeout_sec', 1.0)
         self.declare_parameter('float_precision', 6)
+        self.declare_parameter('interactive', True)
+        self.declare_parameter('allow_overwrite', False)
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
+        self._save_lock = threading.Lock()
+        self._stop_interactive = threading.Event()
         self._save_service = self.create_service(
             Trigger,
             '~/save_current',
@@ -36,10 +42,17 @@ class GoalPoseGenerator(Node):
             'goal_pose_generator ready. '
             'Call /goal_pose_generator/save_current to save map -> base_link.'
         )
+        self._start_interactive_prompt()
 
     def _save_current_callback(self, request, response):
         del request
 
+        success, message = self._save_current_pose()
+        response.success = success
+        response.message = message
+        return response
+
+    def _save_current_pose(self, waypoint_name: str = ''):
         map_frame = str(self.get_parameter('map_frame').value)
         base_frame = str(self.get_parameter('base_frame').value)
         timeout = float(self.get_parameter('lookup_timeout_sec').value)
@@ -52,31 +65,72 @@ class GoalPoseGenerator(Node):
                 timeout=Duration(seconds=timeout),
             )
         except TransformException as exc:
-            response.success = False
-            response.message = (
+            message = (
                 f'failed to lookup transform {map_frame} -> {base_frame}: {exc}'
             )
-            self.get_logger().warn(response.message)
-            return response
+            self.get_logger().warn(message)
+            return False, message
 
         try:
-            output_file = self._resolve_output_file()
-            data = self._load_waypoint_yaml(output_file, map_frame)
-            waypoint_name = self._next_waypoint_name(data)
-            self._append_transform(data, waypoint_name, transform)
-            self._write_waypoint_yaml(output_file, data)
+            with self._save_lock:
+                output_file = self._resolve_output_file()
+                data = self._load_waypoint_yaml(output_file, map_frame)
+                resolved_name = self._resolve_waypoint_name(data, waypoint_name)
+                self._append_transform(data, resolved_name, transform)
+                self._write_waypoint_yaml(output_file, data)
         except Exception as exc:
-            response.success = False
-            response.message = f'failed to save waypoint: {exc}'
-            self.get_logger().error(response.message)
-            return response
+            message = f'failed to save waypoint: {exc}'
+            self.get_logger().error(message)
+            return False, message
 
-        x = data['waypoints'][waypoint_name]['position']['x']
-        y = data['waypoints'][waypoint_name]['position']['y']
-        response.success = True
-        response.message = f'saved {waypoint_name}: x={x}, y={y}'
-        self.get_logger().info(f'{response.message} -> {output_file}')
-        return response
+        saved = data['waypoints'][resolved_name]
+        x = saved['position']['x']
+        y = saved['position']['y']
+        qx = saved['orientation']['x']
+        qy = saved['orientation']['y']
+        qz = saved['orientation']['z']
+        qw = saved['orientation']['w']
+        message = (
+            f'saved {resolved_name}: x={x}, y={y}, '
+            f'qx={qx}, qy={qy}, qz={qz}, qw={qw}'
+        )
+        self.get_logger().info(f'{message} -> {output_file}')
+        return True, message
+
+    def _start_interactive_prompt(self) -> None:
+        if not bool(self.get_parameter('interactive').value):
+            return
+        if not sys.stdin.isatty():
+            self.get_logger().info('interactive prompt disabled: stdin is not a TTY.')
+            return
+
+        thread = threading.Thread(target=self._interactive_prompt_loop, daemon=True)
+        thread.start()
+
+    def _interactive_prompt_loop(self) -> None:
+        self.get_logger().info(
+            'Interactive mode: move the robot to a point, type a waypoint name, '
+            'then press Enter. Type "quit" to stop input.'
+        )
+        while rclpy.ok() and not self._stop_interactive.is_set():
+            try:
+                name = input('Waypoint name > ').strip()
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                self._stop_interactive.set()
+                break
+
+            if not name:
+                print('Waypoint name is empty. Enter a name or type "quit".')
+                continue
+            if name.lower() in ('q', 'quit', 'exit'):
+                self._stop_interactive.set()
+                break
+
+            success, message = self._save_current_pose(name)
+            status = 'OK' if success else 'FAIL'
+            print(f'[{status}] {message}')
 
     def _resolve_output_file(self) -> str:
         configured = str(self.get_parameter('output_file').value).strip()
@@ -131,6 +185,25 @@ class GoalPoseGenerator(Node):
                 max_index = max(max_index, int(match.group(1)))
 
         return f'{prefix}{max_index + 1}'
+
+    def _resolve_waypoint_name(self, data: Dict[str, Any], requested_name: str) -> str:
+        name = requested_name.strip()
+        if not name:
+            name = self._next_waypoint_name(data)
+
+        if not re.match(r'^[A-Za-z0-9_][A-Za-z0-9_-]*$', name):
+            raise ValueError(
+                f'invalid waypoint name "{name}". Use letters, numbers, "_" or "-".'
+            )
+
+        allow_overwrite = bool(self.get_parameter('allow_overwrite').value)
+        if name in data.get('waypoints', {}) and not allow_overwrite:
+            raise ValueError(
+                f'waypoint "{name}" already exists. '
+                'Set allow_overwrite:=true to replace it.'
+            )
+
+        return name
 
     def _append_transform(self, data: Dict[str, Any], name: str, transform) -> None:
         precision = int(self.get_parameter('float_precision').value)
@@ -191,6 +264,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     finally:
+        node._stop_interactive.set()
         node.destroy_node()
         rclpy.shutdown()
 
