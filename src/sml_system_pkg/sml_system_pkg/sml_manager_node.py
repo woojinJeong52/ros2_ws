@@ -3,14 +3,11 @@ sml_manager_node.py
 GetPlan 서비스로 스텝 목록을 받아
 depends_on 기반으로 AMR / WB를 병렬 실행하는 노드.
 
-통신:
-  구독  /sml/task          (sml_msgs/Task)
-  서비스 /sml/get_plan     (sml_msgs/GetPlan)   ← planning_node
-  Action navigate_to_station (sml_msgs/NavTask) → amr_nav_node
-  서비스 /amr_robot_command  (sml_msgs/ArmCommand) → amr_robot_node
-  서비스 /robocup_navigator/post_process (std_srvs/Trigger) → robocup_navigator
-  Action wb_task             (sml_msgs/WbTask)  → workbench_node
-  발행  /sml/status        (std_msgs/String)    모니터링용
+A/B 경기장 대응:
+  - side:=a 또는 side:=b 파라미터 사용
+  - 일반 station은 Step.station_id를 그대로 AMR에 전달
+  - GOAL/복귀 station_id=0은 navigator goal 타입이 string이면 "a"/"b"로 전달
+  - navigator goal 타입이 int32이면 현재 인터페이스 한계상 0을 유지하고 경고 로그를 출력
 """
 
 import threading
@@ -26,6 +23,11 @@ from std_srvs.srv import Trigger
 from sml_msgs.action import NavTask, WbTask
 from sml_msgs.msg import Step, Task
 from sml_msgs.srv import ArmCommand, GetPlan
+
+from sml_system_pkg.arena_side_utils import (
+    normalize_side,
+    nav_target_for_station,
+)
 
 
 class SmlManagerNode(Node):
@@ -46,6 +48,9 @@ class SmlManagerNode(Node):
         self._plan_retry_count = 0
         self._plan_timer       = None
         self._max_plan_retries = 10
+
+        self.declare_parameter('side', 'a')
+        self.side = normalize_side(self.get_parameter('side').value)
 
         self.declare_parameter(
             'post_process_service_name',
@@ -85,7 +90,9 @@ class SmlManagerNode(Node):
         self.status_pub = self.create_publisher(
             String, '/sml/status', 10)
 
-        self.get_logger().info(f'[MANAGER] sml_manager_node 시작 | task_topic={task_topic}')
+        self.get_logger().info(
+            f'[MANAGER] sml_manager_node 시작 | task_topic={task_topic} | side={self.side}'
+        )
 
     # ──────────────────────────────────────────────────────
     # Task 수신 → GetPlan 요청
@@ -99,11 +106,9 @@ class SmlManagerNode(Node):
 
         self.get_logger().info('[MANAGER] Task 수신 → 1초 후 GetPlan 요청')
         self._plan_retry_count = 0
-        # planning_node가 계획을 생성할 시간을 준 뒤 요청
         self._plan_timer = self.create_timer(1.0, self._try_get_plan)
 
     def _try_get_plan(self):
-        # create_timer는 반복 타이머이므로 여기서 cancel
         if self._plan_timer:
             self._plan_timer.cancel()
             self._plan_timer = None
@@ -150,7 +155,7 @@ class SmlManagerNode(Node):
             self.plan_requested = False
 
     # ──────────────────────────────────────────────────────
-    # 스텝 디스패치 (핵심 로직)
+    # 스텝 디스패치
     # ──────────────────────────────────────────────────────
 
     def _dispatch(self):
@@ -186,7 +191,6 @@ class SmlManagerNode(Node):
                          and not self.amr_busy and not self.wb_busy
                          and amr_step is None and wb_step is None)
 
-        # lock 밖에서 실행
         if amr_step:
             self.get_logger().info(
                 f'[MANAGER] AMR step {amr_step.step_id} 시작 '
@@ -223,6 +227,45 @@ class SmlManagerNode(Node):
     # AMR 스텝 실행: NAV Action → ARM Service
     # ──────────────────────────────────────────────────────
 
+    def _assign_nav_goal_target(self, goal, station_id: int) -> str:
+        """
+        navigator goal에 target을 넣는다.
+
+        - station_id == 0이면 side별로 "a"/"b"를 목표로 사용한다.
+        - NavTask.Goal.station_id가 string 타입이면 "a"/"b"를 그대로 넣는다.
+        - NavTask.Goal.station_id가 int 타입이면 인터페이스 한계상 0을 넣고 경고한다.
+        - goal에 location/target/station_name 같은 string 필드가 있으면 함께 채운다.
+        """
+        nav_target = nav_target_for_station(int(station_id), self.side)
+        field_types = goal.get_fields_and_field_types()
+
+        # 보조 문자열 필드가 존재하면 채움
+        for string_field in ('location', 'target', 'station_name', 'station_label'):
+            if string_field in field_types and field_types[string_field] == 'string':
+                setattr(goal, string_field, nav_target)
+
+        if 'station_id' in field_types:
+            station_id_type = field_types['station_id']
+
+            if station_id_type == 'string':
+                goal.station_id = nav_target
+                return nav_target
+
+            # int 계열 station_id
+            if nav_target in ('a', 'b'):
+                self.get_logger().warn(
+                    '[NAV] NavTask.Goal.station_id가 숫자 타입입니다. '
+                    f'복귀 label={nav_target}를 직접 넣을 수 없어 station_id=0으로 전송합니다. '
+                    'navigator에서 side 파라미터로 0을 a/b home으로 해석해야 합니다.'
+                )
+                goal.station_id = 0
+            else:
+                goal.station_id = int(nav_target)
+            return nav_target
+
+        # station_id 필드가 없고 target/location만 있는 경우
+        return nav_target
+
     def _execute_amr(self, step, retry=0):
         MAX_RETRY = 1
 
@@ -234,10 +277,11 @@ class SmlManagerNode(Node):
             return
 
         goal = NavTask.Goal()
-        goal.station_id = step.station_id
+        nav_target = self._assign_nav_goal_target(goal, int(step.station_id))
 
         self.get_logger().info(
-            f'[NAV] step {step.step_id} → station {step.station_id} 이동')
+            f'[NAV] step {step.step_id} → '
+            f'station_id={step.station_id}, nav_target={nav_target} 이동')
 
         send_future = self.nav_client.send_goal_async(goal)
         send_future.add_done_callback(
@@ -278,7 +322,6 @@ class SmlManagerNode(Node):
             f'[NAV] step {step.step_id} 도착 완료')
 
         if step.action == Step.GOAL:
-            # 단순 이동(00 복귀)이므로 ARM 호출 없이 바로 완료 처리
             self.get_logger().info(
                 f'[NAV] step {step.step_id} GOAL 도착 → ARM 생략, 완료 처리')
             with self._lock:
@@ -327,7 +370,6 @@ class SmlManagerNode(Node):
         if not response.success:
             self.get_logger().error(
                 f'[ARM] step {step.step_id} 실패: {response.message}')
-            # OBJECT_NOT_FOUND는 재시도 의미 없음
             retriable = 'object not found' not in response.message.lower()
             if retry < MAX_RETRY and retriable:
                 self.get_logger().warn(
@@ -392,7 +434,6 @@ class SmlManagerNode(Node):
             else:
                 with self._lock:
                     self.amr_busy = False
-                self._dispatch()
             return
 
         self.get_logger().info(f'[POST] step {step.step_id} 완료')
@@ -416,7 +457,7 @@ class SmlManagerNode(Node):
         goal.work_type  = ('PRODUCE'
                            if step.action == Step.PRODUCE
                            else 'RECYCLE')
-        goal.product_id = step.object_ids[0]  # [13] 또는 [81]의 첫 번째
+        goal.product_id = step.object_ids[0]
 
         self.get_logger().info(
             f'[WB] step {step.step_id} → '
@@ -482,11 +523,13 @@ class SmlManagerNode(Node):
         }
         self.get_logger().info('===== 수신된 스텝 시퀀스 =====')
         for s in steps:
+            nav_target = nav_target_for_station(int(s.station_id), self.side) if s.type == Step.AMR else '-'
             self.get_logger().info(
                 f'[{s.step_id:2d}] {type_map.get(s.type, "??")} | '
                 f'{action_map.get(s.action, "?")} | '
                 f'objects={list(s.object_ids)} | '
                 f'station={s.station_id} | '
+                f'nav_target={nav_target} | '
                 f'depends_on={list(s.depends_on)}')
         self.get_logger().info('==============================')
 

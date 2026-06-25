@@ -52,9 +52,8 @@ class MockArmNode(Node):
 
         self.get_logger().info(
             f'[MOCK ARM] {request.action} 완료 '
-            f'slots={response.slots} object_ids={response.object_ids}')
+            f'slots={list(response.slots)} object_ids={list(response.object_ids)}')
         return response
-
 
 def main(args=None):
     rclpy.init(args=args)

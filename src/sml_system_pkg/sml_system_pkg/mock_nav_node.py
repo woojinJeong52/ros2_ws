@@ -2,6 +2,7 @@
 mock_nav_node.py
 navigate_to_station Action 서버 mock.
 goal 수신 → MOVING 피드백 → delay 후 success=True 반환.
++ /robocup_navigator/post_process (std_srvs/Trigger) 서비스 mock.
 """
 
 import time
@@ -10,6 +11,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+from std_srvs.srv import Trigger
 
 from sml_msgs.action import NavTask
 
@@ -30,6 +32,14 @@ class MockNavNode(Node):
             callback_group=self.cbg,
         )
         self.get_logger().info('[MOCK NAV] navigate_to_station 서버 시작')
+
+        self._post_process_srv = self.create_service(
+            Trigger,
+            '/robocup_navigator/post_process',
+            self._post_process_cb,
+            callback_group=self.cbg,
+        )
+        self.get_logger().info('[MOCK NAV] post_process 서비스 시작')
 
     def _execute_cb(self, goal_handle):
         station_id = goal_handle.request.station_id
@@ -55,6 +65,12 @@ class MockNavNode(Node):
         self.get_logger().info(
             f'[MOCK NAV] 완료: station_id={station_id}')
         return result
+
+    def _post_process_cb(self, request, response):
+        self.get_logger().info('[MOCK NAV] post_process 호출됨 → success')
+        response.success = True
+        response.message = ''
+        return response
 
 
 def main(args=None):
