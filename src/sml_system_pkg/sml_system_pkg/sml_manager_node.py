@@ -392,6 +392,7 @@ class SmlManagerNode(Node):
             else:
                 with self._lock:
                     self.amr_busy = False
+                self._dispatch()
             return
 
         self.get_logger().info(f'[POST] step {step.step_id} 완료')
