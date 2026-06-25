@@ -5,7 +5,6 @@ import glob
 import cv2
 import math
 
-import torch
 import open3d as o3d
 from sklearn.cluster import DBSCAN
 from ultralytics import YOLO
@@ -1549,6 +1548,8 @@ def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, vis
                                          None일 경우 모든 클래스를 검출합니다.
         device (int or str): 추론 장치. 0(또는 양수 정수)이면 GPU, 'cpu'이면 CPU 사용.
                              기본값 0 (GPU 0).
+        retina_masks (bool): True이면 입력 이미지 해상도와 동일한 고해상도 마스크를 반환.
+                             기본값 True (depth PCA 정확도 향상).
         visualize (bool): 추론 결과(YOLO plot)를 Matplotlib으로 시각화할지 여부
         
     Returns:
@@ -1560,11 +1561,11 @@ def detect_objects_yolo(model, color_img_bgr, target_classes=None, device=0, vis
     # 1. 원본 이미지 크기 파악 (마스크 리사이즈용)
     img_height, img_width = color_img_bgr.shape[:2]
     
-    # 2. 모델 추론 (클래스 필터링 적용)
+    # 2. 모델 추론 (클래스 필터링 적용, 전체 해상도 마스크 반환)
     if target_classes is not None:
-        results = model(color_img_bgr, classes=target_classes, device=device, verbose=False)
+        results = model(color_img_bgr, classes=target_classes, device=device, retina_masks=True, verbose=False)
     else:
-        results = model(color_img_bgr, device=device, verbose=False)
+        results = model(color_img_bgr, device=device, retina_masks=True, verbose=False)
 
     # 3. 마스크 병합용 빈 도화지 생성
     mask_binary = np.zeros((img_height, img_width), dtype=np.uint8)
