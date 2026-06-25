@@ -27,6 +27,7 @@ class GoalPoseGenerator(Node):
         self.declare_parameter('float_precision', 6)
         self.declare_parameter('interactive', True)
         self.declare_parameter('allow_overwrite', False)
+        self.declare_parameter('auto_station_blocks', True)
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
@@ -77,6 +78,7 @@ class GoalPoseGenerator(Node):
                 data = self._load_waypoint_yaml(output_file, map_frame)
                 resolved_name = self._resolve_waypoint_name(data, waypoint_name)
                 self._append_transform(data, resolved_name, transform)
+                station_message = self._update_station_block(data, resolved_name)
                 self._write_waypoint_yaml(output_file, data)
         except Exception as exc:
             message = f'failed to save waypoint: {exc}'
@@ -94,6 +96,8 @@ class GoalPoseGenerator(Node):
             f'saved {resolved_name}: x={x}, y={y}, '
             f'qx={qx}, qy={qy}, qz={qz}, qw={qw}'
         )
+        if station_message:
+            message = f'{message}; {station_message}'
         self.get_logger().info(f'{message} -> {output_file}')
         return True, message
 
@@ -138,13 +142,19 @@ class GoalPoseGenerator(Node):
             return os.path.abspath(os.path.expanduser(os.path.expandvars(configured)))
 
         source_candidate = os.path.abspath(
-            os.path.join(os.getcwd(), 'src', 'amr_navigator', 'params', 'waypoints.yaml')
+            os.path.join(
+                os.getcwd(),
+                'src',
+                'robocup_navigator',
+                'params',
+                'stations_robocup.yaml',
+            )
         )
         if os.path.exists(source_candidate):
             return source_candidate
 
-        share_dir = get_package_share_directory('amr_navigator')
-        return os.path.join(share_dir, 'params', 'waypoints.yaml')
+        share_dir = get_package_share_directory('robocup_navigator')
+        return os.path.join(share_dir, 'params', 'stations_robocup.yaml')
 
     def _load_waypoint_yaml(self, path: str, frame_id: str) -> Dict[str, Any]:
         if os.path.exists(path):
@@ -162,10 +172,14 @@ class GoalPoseGenerator(Node):
         elif not isinstance(waypoints, dict):
             raise ValueError('waypoints must be a map')
 
+        stations = data.get('stations')
+        if stations is not None and not isinstance(stations, dict):
+            raise ValueError('stations must be a map')
+
         sequence = data.get('sequence')
-        if sequence is None:
+        if sequence is None and stations is None:
             data['sequence'] = list(data['waypoints'].keys())
-        elif not isinstance(sequence, list):
+        elif sequence is not None and not isinstance(sequence, list):
             raise ValueError('sequence must be a list')
 
         data['frame_id'] = data.get('frame_id') or frame_id
@@ -224,8 +238,47 @@ class GoalPoseGenerator(Node):
             },
         }
 
-        if name not in data['sequence']:
-            data['sequence'].append(name)
+        sequence = data.get('sequence')
+        if isinstance(sequence, list) and name not in sequence:
+            sequence.append(name)
+
+    def _update_station_block(self, data: Dict[str, Any], waypoint_name: str) -> str:
+        if not bool(self.get_parameter('auto_station_blocks').value):
+            return ''
+
+        match = re.match(r'^station_(\d+)_(sub_goal|goal)$', waypoint_name)
+        if not match:
+            return ''
+
+        station_id = int(match.group(1))
+        station_key = station_id
+        stations = data.setdefault('stations', {})
+
+        # Preserve existing YAML key style if the station already exists as a string.
+        if station_id not in stations and str(station_id) in stations:
+            station_key = str(station_id)
+
+        if station_id == 0:
+            sequence = ['station_0_goal']
+            post_process = False
+        else:
+            sequence = [
+                f'station_{station_id}_sub_goal',
+                f'station_{station_id}_goal',
+            ]
+            post_process = True
+
+        existing = stations.get(station_key)
+        if existing is not None and not isinstance(existing, dict):
+            raise ValueError(f'stations.{station_key} must be a map')
+
+        stations[station_key] = {
+            'name': f'station_{station_id}',
+            'sequence': sequence,
+            'post_process': post_process,
+        }
+
+        return f'updated stations.{station_id} sequence={sequence}'
 
     def _write_waypoint_yaml(self, path: str, data: Dict[str, Any]) -> None:
         directory = os.path.dirname(path)

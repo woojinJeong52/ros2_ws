@@ -14,12 +14,13 @@ def generate_launch_description():
     float_precision = LaunchConfiguration('float_precision')
     interactive = LaunchConfiguration('interactive')
     allow_overwrite = LaunchConfiguration('allow_overwrite')
+    auto_station_blocks = LaunchConfiguration('auto_station_blocks')
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'output_file',
             default_value='',
-            description='Waypoint YAML path. Empty uses src/amr_navigator/params/waypoints.yaml when launched from the workspace.',
+            description='Waypoint YAML path. Empty uses src/robocup_navigator/params/stations_robocup.yaml when launched from the workspace.',
         ),
         DeclareLaunchArgument('map_frame', default_value='map'),
         DeclareLaunchArgument('base_frame', default_value='base_link'),
@@ -28,6 +29,7 @@ def generate_launch_description():
         DeclareLaunchArgument('float_precision', default_value='6'),
         DeclareLaunchArgument('interactive', default_value='true'),
         DeclareLaunchArgument('allow_overwrite', default_value='false'),
+        DeclareLaunchArgument('auto_station_blocks', default_value='true'),
         Node(
             package='amr_navigator',
             executable='goal_pose_generator',
@@ -42,6 +44,6 @@ def generate_launch_description():
                 {'float_precision': ParameterValue(float_precision, value_type=int)},
                 {'interactive': ParameterValue(interactive, value_type=bool)},
                 {'allow_overwrite': ParameterValue(allow_overwrite, value_type=bool)},
+                {'auto_station_blocks': ParameterValue(auto_station_blocks, value_type=bool)},
             ],
         ),
-    ])
