@@ -15,7 +15,7 @@ class VisionNode(Node):
 
 
     def get_pose_cb(self, request, response):
-        target_str = str(request.target_color).strip()
+        target_str = request.target_color.strip()
         self.get_logger().info(f'[VISION] 서비스 요청 수신 - target ID: {target_str}')
 
         try:
@@ -82,10 +82,11 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.vision.close()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
+
+
