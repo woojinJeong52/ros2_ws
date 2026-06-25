@@ -45,7 +45,7 @@ class VisionNode(Node):
                 response.x = float(result["x_mm"] / 1000.0)
                 response.y = float(result["y_mm"] / 1000.0)
                 response.z = float(result["z_mm"] / 1000.0)
-                response.yaw = float(result["yaw_deg"] + 90.0)
+                response.yaw = float(result["yaw_deg"] + 90)
                 response.class_name = str(result["class_name"])
 
                 self.get_logger().info(
@@ -88,5 +88,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
