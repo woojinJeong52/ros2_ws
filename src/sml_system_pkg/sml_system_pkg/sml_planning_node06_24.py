@@ -86,7 +86,7 @@ MAIN_WORKBENCH_STATION_ID = 5
 
 STATION_COORD_JSON_PARAM = 'station_coord_json_path'
 DEFAULT_STATION_COORD_JSON_PATH = (
-    '/home/user/ros2_ws/src/sml_system_pkg/config/station_coordinates_a_zone.json'
+    '/home/vision/ros2_ws/src/sml_system_pkg/config/station_coordinates_a_zone.json'
 )
 
 # 메시지에 OT_LIFECYCLE이 없을 수도 있으므로 3을 fallback으로 사용
