@@ -24,14 +24,14 @@ SLOT_WAYPOINTS = {
     1: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-15.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-15.0, -36.42, 117.55, 0.0, 98.86, 0.0]),
         np.array([53.60, 23.71, 15.87, 3.85, 130.79, 0.0]),
-        np.array([67.78, -2.06, 59.03, 4.11, 113.71, -20.45]),
+        np.array([72.73, 14.6, 40.31, -1.80, 129.55, -18.36]),
     ],
     2: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-165.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-160.24, -33.11, 115.37, 0.0, 97.76, 0.0]),
         np.array([-220.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-250.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-266.73, 9.62, 46.62, -1.82, 116.78, 2.62]),
@@ -39,7 +39,7 @@ SLOT_WAYPOINTS = {
     3: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-165.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-160.24, -33.11, 115.37, 0.0, 97.76, 0.0]),
         np.array([-220.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-250.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-254.05, 12.14, 43.94, -3.51, 117.43, 14.43]),
@@ -47,7 +47,7 @@ SLOT_WAYPOINTS = {
     4: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-165.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-160.24, -33.11, 115.37, 0.0, 97.76, 0.0]),
         np.array([-220.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-250.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-243.17, 18.56, 36.13, -4.91, 119.49, 24.47]),
@@ -55,14 +55,14 @@ SLOT_WAYPOINTS = {
     5: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-165.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-160.24, -33.11, 115.37, 0.0, 97.76, 0.0]),
         np.array([-220.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-241.67, 1.06, 55.62, 0.0, 123.30, 28.34]),
     ],
     6: [
         np.array([-90.0, 0.0, 90.0, 0.0, 90.0, 0.0]),
         np.array([-90.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
-        np.array([-165.0, -20.81, 107.71, 0.0, 93.11, 0.0]),
+        np.array([-160.24, -33.11, 115.37, 0.0, 97.76, 0.0]),
         np.array([-220.0, -11.96, 57.40, 0.0, 100.40, 0.0]),
         np.array([-261.20, -4.82, 61.32, 0.0, 123.49, 8.82]),
     ],
@@ -88,7 +88,34 @@ DELIVERY_WAYPOINTS = {
     5: [
         np.array([-103.28, 53.86, 66.91, 0.0, 59.23, -13.27]),
     ],
+    # 6번: 완성품(Products) 전용 내려놓기 포인트.
+    #      완성품 unload 는 delivery_idx 와 무관하게 무조건 이 포인트로 간다.
+    6: [
+        np.array([-88.55, 39.48, 126.07, -49.84, -63.94, 11.46]),
+    ],
 }
+
+# 완성품 unload 후 비전 검증용 조인트 포인트.
+# 실제 카메라가 내려놓은 완성품을 위에서 볼 수 있는 자세로 교체해서 사용한다.
+PRODUCT_VERIFY_WAYPOINTS = {
+    6: [
+        np.array([-88.55, 39.48, 126.07, -49.84, -63.94, 11.46]),
+    ],
+}
+
+# 완성품 층 그룹 — delivery 시 내려놓는 높이(z)가 그룹별로 다르다.
+PRODUCT_FLOOR_1   = {34, 13, 81}               # 1층:   배터리, 마그넷, 이스탑
+PRODUCT_FLOOR_2_5 = {442, 241, 462, 8518}      # 2층반: 당근, 신호등, 스몰트리, 버거
+PRODUCT_FLOOR_2   = {711, 4482, 48132, 46262}  # 2층:   망치, 큰당근, 아이스크림, 빅트리
+
+# 완성품(Products) ID 묶음 = 위 3개 층 그룹의 합집합.
+# 이 집합에 속하면 unload 시 완성품 전용 경로를 탄다.
+# (raw material 1~8 은 포함하지 않음 -> 기존 DELIVERY_WAYPOINTS 흐름 그대로)
+FINISHED_PRODUCTS = PRODUCT_FLOOR_1 | PRODUCT_FLOOR_2_5 | PRODUCT_FLOOR_2
+
+# 완성품 unload 시 사용할 고정 delivery 인덱스.
+# 완성품은 처리 순서(delivery_idx)와 무관하게 항상 DELIVERY_WAYPOINTS[6] 으로 간다.
+PRODUCT_DELIVERY_IDX = 6
 
 # --- LOAD 비전/오프셋 상수 ---
 CAM_X_OFF = -51.0
@@ -97,14 +124,82 @@ LOAD_Z_DOWN_MM = 15.0
 LOAD_Z_UP_MM = -15.0
 Z_OFFSET = -85.0
 Z_MARGIN = 40.0
-SCAN_Y_OFFSETS_MM = [0.0, 150.0, -150.0]
+SCAN_Y_OFFSETS_MM = [0.0, 100.0, -100.0, 180.0, -180.0]
 SCAN_Y_AXIS_INDEX = 1
 SCAN_SETTLE_TIME_SEC = 0.3
 SCAN_VISION_RETRIES_PER_POSE = 1
+PRODUCT_VERIFY_SETTLE_TIME_SEC = 0.3
+PRODUCT_VERIFY_VISION_RETRIES = 1
+
+# # --- LOAD yaw(rz) 보정 상수 ---
+# # 특정 완성품은 파지 방향을 맞추기 위해 비전 yaw 에 고정 오프셋(deg)을 더한다.
+# # e_stop(81), burger(8518), big_tree(46262) -> -90도
+# # 여기 없는 object_id 는 오프셋 0 (비전 yaw 그대로 사용).
+# YAW_OFFSET_DEG = {
+#     81: -90.0,     # e_stop
+#     8518: -90.0,   # burger
+#     46262: 0.0,  # big_tree
+# }
+
+# --- 제품별 파지 오프셋 (LOAD 전용) ---
+# YAW_OFFSET_DEG 와 같은 방식으로 object_id 별로 파지 보정을 따로 준다.
+# 비전이 준 좌표 위에 "더해지는" 추가 보정값. 전역 CAM/Z 오프셋은 그대로 두고
+# 제품마다 미세 보정만 얹는다. (yaw 가 p.yaw + offset 으로 더해지던 것과 동일 패턴)
+#
+#   x   : 최종 접근 move_l_rel 의 tool x 병진에 더할 값 (mm)
+#   y   : 최종 접근 move_l_rel 의 tool y 병진에 더할 값 (mm)
+#   z   : 파지 깊이(tool z)에 더할 값 (mm, +면 더 깊이)
+#   yaw : 파지 회전(rz)에 더할 값 (deg)
+#
+# 생략한 키는 0. 테이블에 없는 object_id 도 전부 0.
+PICK_OFFSET_DEFAULT = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0}
+
+PICK_OFFSET = {
+    # --- Raw Materials ---
+    1: {},  # 2x2_red
+    2: {},  # 2x2_green
+    3: {},  # 2x2_blue
+    4: {},  # 2x2_yellow
+    5: {'yaw': 90.0},  # 4x2_red
+    6: {'yaw': 90.0},  # 4x2_green
+    7: {'yaw': 90.0},  # 4x2_blue
+    8: {'yaw': 90.0},  # 4x2_yellow
+    # --- Products ---
+    34:    {},               # battery
+    13:    {},               # magnet
+    81:    {'x': -10.0,'yaw': -90.0,'z': 10.0},   # e_stop
+    442:   {},               # carrot
+    241:   {},               # traffic_light
+    462:   {'z': 10.0},               # small_tree
+    711:   {'x': -10.0, 'z': 10.0},     # hammer 로봇베이스 기준 안쪽은 x+ 
+    4482:  {'x': -10.0},               # big_carrot
+    8518:  {'z': 20.0,'yaw': -90.0},   # burger
+    48132: {'z': 10.0},               # ice_cream
+    46262: {'z': 20.0},      # big_tree 벅서 빅트리 회전제한 -90~90
+}
+
+
+def get_pick_offset(object_id):
+    """object_id 의 파지 오프셋을 (없는 키는 0 으로 채워) 반환한다."""
+    off = dict(PICK_OFFSET_DEFAULT)
+    off.update(PICK_OFFSET.get(object_id, {}))
+    return off
 
 # --- UNLOAD Z 상수 ---
 UNLOAD_Z_DOWN_MM = 18.0
 UNLOAD_Z_UP_MM = -18.0
+
+# --- 완성품(Products) 전용 delivery Z 상수 (층별 3단계) ---
+# 완성품은 6번 포인트에서 손목이 꺾여 Tool z축이 수직이 아니므로,
+# delivery 내려놓기는 Base 프레임(중력 방향) 기준으로 수행한다.
+# 아래 값은 "내려가는 거리(양수=깊이)" 로 정의한다. (코드에서 Base z- 로 변환)
+# TODO: 각 층 실제 높이에 맞게 값 조정.
+PRODUCT_FLOOR_1_Z_DOWN_MM   = 100.0   # 1층
+PRODUCT_FLOOR_1_Z_UP_MM     = -100.0
+PRODUCT_FLOOR_2_5_Z_DOWN_MM = 90.0    # 2층반
+PRODUCT_FLOOR_2_5_Z_UP_MM   = -90.0
+PRODUCT_FLOOR_2_Z_DOWN_MM   = 80.0    # 2층
+PRODUCT_FLOOR_2_Z_UP_MM     = -80.0
 
 
 J_VEL, J_ACC = 255, 255
@@ -182,7 +277,7 @@ class AmrRobotNode(Node):
         self.cargo_client = self.create_client(
             Cargo, '/cargo', callback_group=self.cbg)
         self.srv = self.create_service(
-            ArmCommand, '/amr_robot_command', self.arm_command_cb, callback_group=self.cbg)
+            ArmCommand, '/amr_robot_command', self.arm_robot_command_cb, callback_group=self.cbg)
 
         self._busy_lock = threading.Lock()
         self._busy = False
@@ -242,7 +337,7 @@ class AmrRobotNode(Node):
             req = GetTargetPose.Request()
             req.target_color = target_color
             req.target_size = ""
-            res = self.call_service(self.vision_client, req, timeout=30)
+            res = self.call_service(self.vision_client, req, timeout=30.0)
             if res and res.success:
                 return res
             self.get_logger().warn(f'[AMR] vision retry {i + 1}/{retries}')
@@ -289,8 +384,6 @@ class AmrRobotNode(Node):
             if res:
                 self.get_logger().info(
                     f'[AMR] vision success at y_offset={current_y_offset:.0f}mm')
-                if not self.return_scan_center(current_y_offset):
-                    self.get_logger().error('[AMR] failed to return scan center after success')
                 return res
 
         self.get_logger().warn('[AMR] vision scan failed at all y offsets')
@@ -341,17 +434,20 @@ class AmrRobotNode(Node):
             return False
         return self.wait_move(timeout=timeout, label=label)
 
-    def move_l_rel_checked(self, delta, label='move_l_rel', timeout=10.0):
+    def move_l_rel_checked(self, delta, label='move_l_rel', timeout=10.0,
+                           ref_frame=None):
         if not self.is_robot_ready():
             return False
+        if ref_frame is None:
+            ref_frame = rb.ReferenceFrame.Tool
         try:
-            self.get_logger().info(f'[AMR] command start {label}: {delta}')
+            self.get_logger().info(f'[AMR] command start {label}: {delta} (frame={ref_frame})')
             self.robot.move_l_rel(
                 self.rc,
                 np.array(delta, dtype=float),
                 L_VEL,
                 L_ACC,
-                rb.ReferenceFrame.Tool,
+                ref_frame,
             )
         except Exception as e:
             self.get_logger().error(f'[AMR] {label} command failed: {e}')
@@ -425,6 +521,17 @@ class AmrRobotNode(Node):
         self._at_home = True
         return True
 
+    def product_delivery_z(self, object_id):
+        """완성품 object_id가 속한 층 그룹의 delivery (z_down, z_up) 을 돌려준다.
+        어느 그룹에도 없으면 기본 UNLOAD Z 로 안전하게 폴백한다."""
+        if object_id in PRODUCT_FLOOR_1:
+            return PRODUCT_FLOOR_1_Z_DOWN_MM, PRODUCT_FLOOR_1_Z_UP_MM
+        if object_id in PRODUCT_FLOOR_2_5:
+            return PRODUCT_FLOOR_2_5_Z_DOWN_MM, PRODUCT_FLOOR_2_5_Z_UP_MM
+        if object_id in PRODUCT_FLOOR_2:
+            return PRODUCT_FLOOR_2_Z_DOWN_MM, PRODUCT_FLOOR_2_Z_UP_MM
+        return UNLOAD_Z_DOWN_MM, UNLOAD_Z_UP_MM
+
     def move_to_delivery(self, delivery_idx):
         waypoints = DELIVERY_WAYPOINTS.get(delivery_idx)
         if waypoints is None:
@@ -462,9 +569,169 @@ class AmrRobotNode(Node):
         self.get_logger().info(f'[AMR] returned from delivery position {delivery_idx}')
         return True
 
+    def move_to_product_verify(self):
+        waypoints = PRODUCT_VERIFY_WAYPOINTS.get(PRODUCT_DELIVERY_IDX)
+        if waypoints is None:
+            self.get_logger().error('[AMR] no product verification waypoints')
+            return False
+
+        self._at_home = False
+        for idx, wp in enumerate(waypoints, start=1):
+            if not self.move_j_checked(wp, label=f'move_to_product_verify wp{idx}'):
+                return False
+
+        self.get_logger().info('[AMR] product verification position reached')
+        return True
+
+    def verify_product_unload(self, object_id):
+        if not self.move_to_product_verify():
+            return False
+
+        time.sleep(PRODUCT_VERIFY_SETTLE_TIME_SEC)
+        res = self.call_vision(str(object_id), retries=PRODUCT_VERIFY_VISION_RETRIES)
+
+        if res and res.success:
+            self.get_logger().error(
+                f'[UNLOAD VERIFY] object_id={object_id} still detected; treat as fail'
+            )
+            return False
+
+        self.get_logger().info(
+            f'[UNLOAD VERIFY] object_id={object_id} not detected; treat as success'
+        )
+        return True
+
+    def pick_from_floor_by_vision(self, object_id, label_prefix='pick'):
+        vision_target = str(object_id)
+
+        if not self.call_gripper(False):
+            return False
+
+        if not self.go_home():
+            return False
+
+        p = self.call_vision_with_y_scan(vision_target)
+        if not p:
+            self.get_logger().error(f'[AMR] vision failed during {label_prefix}')
+            self.go_home()
+            return False
+
+        off = get_pick_offset(object_id)
+        dx = -(p.x * 1000.0) + CAM_Y_OFF
+        dy = (p.y * 1000.0) + CAM_X_OFF
+        z_move = (p.z * 1000.0) + Z_OFFSET
+        yaw = p.yaw + off['yaw']
+
+        tool_x = dy + off['x']
+        tool_y = dx + off['y']
+        tool_z = (z_move - Z_MARGIN) + off['z']
+
+        if any(off[k] != 0.0 for k in ('x', 'y', 'z', 'yaw')):
+            self.get_logger().info(
+                f'[AMR] {label_prefix} offset applied: object_id={object_id}, '
+                f'off={off}, vision_yaw={p.yaw:.2f} -> yaw={yaw:.2f}'
+            )
+
+        self._at_home = False
+        if not self.move_l_rel_checked(
+            [tool_x, tool_y, tool_z, 0.0, 0.0, yaw],
+            label=f'{label_prefix} yaw+xy+z approach',
+        ):
+            self.go_home()
+            return False
+
+        if not self.move_l_rel_checked(
+            [0.0, 0.0, Z_MARGIN, 0.0, 0.0, 0.0],
+            label=f'{label_prefix} z final approach',
+        ):
+            self.go_home()
+            return False
+        time.sleep(0.5)
+
+        if not self.call_gripper(True):
+            self.get_logger().error(f'[AMR] {label_prefix} grip failed')
+            self.move_l_rel_checked(
+                [0.0, 0.0, -100.0, 0.0, 0.0, 0.0],
+                label=f'{label_prefix} retreat after grip failure',
+            )
+            self.go_home()
+            return False
+
+        if not self.move_l_rel_checked(
+            [0.0, 0.0, -50.0, 0.0, 0.0, 0.0],
+            label=f'{label_prefix} lift after grip',
+        ):
+            self.go_home()
+            return False
+
+        return True
+
+    def place_at_delivery(self, object_id, delivery_idx, is_product):
+        if not self.move_to_delivery(delivery_idx):
+            self.go_home()
+            return False
+
+        if is_product:
+            z_down, z_up = self.product_delivery_z(object_id)
+            delivery_ref = rb.ReferenceFrame.Base
+            delivery_down = [0.0, 0.0, -z_down, 0.0, 0.0, 0.0]
+            delivery_up = [0.0, 0.0, -z_up, 0.0, 0.0, 0.0]
+        else:
+            delivery_ref = rb.ReferenceFrame.Tool
+            delivery_down = [0.0, 0.0, UNLOAD_Z_DOWN_MM, 0.0, 0.0, 0.0]
+            delivery_up = [0.0, 0.0, UNLOAD_Z_UP_MM, 0.0, 0.0, 0.0]
+
+        if not self.move_l_rel_checked(
+            delivery_down,
+            label='delivery z down',
+            ref_frame=delivery_ref,
+        ):
+            self.go_home()
+            return False
+
+        if not self.call_gripper(False):
+            self.get_logger().error('[AMR] final gripper open failed')
+            self.move_l_rel_checked(
+                delivery_up,
+                label='retreat after delivery open failure',
+                ref_frame=delivery_ref,
+            )
+            self.go_home()
+            return False
+
+        if not self.move_l_rel_checked(
+            delivery_up,
+            label='delivery z up',
+            ref_frame=delivery_ref,
+        ):
+            self.go_home()
+            return False
+
+        return True
+
+    def retry_product_unload_recovery(self, object_id):
+        self.get_logger().warn(
+            f'[UNLOAD VERIFY] recovery start: object_id={object_id}'
+        )
+
+        if not self.pick_from_floor_by_vision(object_id, label_prefix='recovery'):
+            return False
+
+        if not self.go_home():
+            return False
+
+        if not self.place_at_delivery(
+            object_id,
+            PRODUCT_DELIVERY_IDX,
+            is_product=True,
+        ):
+            return False
+
+        return True
+
     # --- 서비스 콜백 (LOAD / UNLOAD 분기) ---
 
-    def arm_command_cb(self, request, response):
+    def arm_robot_command_cb(self, request, response):
         response.slots = []
         response.object_ids = []
 
@@ -595,16 +862,43 @@ class AmrRobotNode(Node):
         #    yaw(rz)는 tool Z축 방향 자체를 안 바꾸므로, HOME에서 측정한 dx/dy/z를
         #    한 모션에 합칠 수 있다. 단 물체 바로 위(Z_MARGIN)까지만 대각선으로 내려가고,
         #    최종 접근은 5번에서 수직으로 따로 한다. (대각선 최종접근은 파지 안정성 저하)
+        off = get_pick_offset(object_id)
         dx = -(p.x * 1000.0) + CAM_Y_OFF
         dy = (p.y * 1000.0) + CAM_X_OFF
         z_move = (p.z * 1000.0) + Z_OFFSET
-        #    NOTE: p.yaw 단위는 deg. 손목이 반대로 돌거나 단위가 rad이면
-        #          rz 항(p.yaw)을 -p.yaw 또는 np.radians(p.yaw)로 조정할 것.
+
+        # #    NOTE: p.yaw 단위는 deg. 손목이 반대로 돌거나 단위가 rad이면
+        # #          rz 항(yaw)을 -yaw 또는 np.radians(...)로 조정할 것.
+        # #    특정 완성품(e_stop/burger/big_tree)은 파지 방향을 맞추려고 -90도 보정.
+        # yaw = p.yaw + YAW_OFFSET_DEG.get(object_id, 0.0)
+        # if object_id in YAW_OFFSET_DEG:
+        #     self.get_logger().info(
+        #         f'[LOAD] yaw offset applied: object_id={object_id}, '
+        #         f'vision_yaw={p.yaw:.2f} -> yaw={yaw:.2f}')
+        # self._at_home = False  # 이 이동부터 HOME을 벗어남
+        # if not self.move_l_rel_checked(
+        #     [dy, dx, z_move - Z_MARGIN, 0.0, 0.0, yaw],
+        #     label='yaw+xy+z approach',
+        # ):
+        #    NOTE: p.yaw 단위는 deg. 손목이 반대로 돌거나 단위가 rad이면 조정.
+        #    제품별 파지 보정(PICK_OFFSET)을 비전 좌표 위에 더한다.
+        yaw = p.yaw + off['yaw']
+
+        tool_x = dy + off['x']
+        tool_y = dx + off['y']
+        tool_z = (z_move - Z_MARGIN) + off['z']
+
+        if any(off[k] != 0.0 for k in ('x', 'y', 'z', 'yaw')):
+            self.get_logger().info(
+                f'[LOAD] pick offset applied: object_id={object_id}, '
+                f'off={off}, vision_yaw={p.yaw:.2f} -> yaw={yaw:.2f}')
+
         self._at_home = False  # 이 이동부터 HOME을 벗어남
         if not self.move_l_rel_checked(
-            [dy, dx, z_move - Z_MARGIN, 0.0, 0.0, p.yaw],
+            [tool_x, tool_y, tool_z, 0.0, 0.0, yaw],
             label='yaw+xy+z approach',
         ):
+
             self.go_home()
             return {
                 'success': False,
@@ -760,6 +1054,11 @@ class AmrRobotNode(Node):
 
         self.get_logger().info(f'[UNLOAD START] object_id={object_id}, delivery_idx={delivery_idx}')
 
+        # 완성품 여부 판별: 완성품이면 delivery 단계에서 전용 포인트/전용 Z를 쓴다.
+        is_product = object_id in FINISHED_PRODUCTS
+        if is_product:
+            self.get_logger().info(f'[UNLOAD] object_id={object_id} is a finished product')
+
         # 1. 슬롯 확인
         res = self.call_cargo('FIND_OBJECT', object_id=object_id)
         if not res or not res.success:
@@ -864,56 +1163,38 @@ class AmrRobotNode(Node):
             }
 
         # 9. 배달 위치로 이동
-        if not self.move_to_delivery(delivery_idx):
+        #    완성품은 처리 순서(delivery_idx)와 무관하게 항상 6번 포인트로 간다.
+        target_delivery_idx = PRODUCT_DELIVERY_IDX if is_product else delivery_idx
+        if not self.place_at_delivery(object_id, target_delivery_idx, is_product):
             self.go_home()
             return {
                 'success': False,
                 'slot': slot,
                 'object_id': object_id,
-                'message': 'move to delivery failed',
+                'message': 'delivery placement failed',
             }
 
-        # 10. Z 하강 -> open -> Z 상승
-        if not self.move_l_rel_checked(
-            [0.0, 0.0, UNLOAD_Z_DOWN_MM, 0.0, 0.0, 0.0],
-            label='delivery z down',
-        ):
-            self.go_home()
-            return {
-                'success': False,
-                'slot': slot,
-                'object_id': object_id,
-                'message': 'delivery z down failed',
-            }
+        if is_product and not self.verify_product_unload(object_id):
+            if not self.retry_product_unload_recovery(object_id):
+                self.go_home()
+                return {
+                    'success': False,
+                    'slot': slot,
+                    'object_id': object_id,
+                    'message': 'product unload recovery failed',
+                }
 
-        if not self.call_gripper(False):
-            self.get_logger().error('[AMR] final gripper open failed')
-            self.move_l_rel_checked(
-                [0.0, 0.0, UNLOAD_Z_UP_MM, 0.0, 0.0, 0.0],
-                label='retreat after delivery open failure',
-            )
-            self.go_home()
-            return {
-                'success': False,
-                'slot': slot,
-                'object_id': object_id,
-                'message': 'final gripper open failed',
-            }
-
-        if not self.move_l_rel_checked(
-            [0.0, 0.0, UNLOAD_Z_UP_MM, 0.0, 0.0, 0.0],
-            label='delivery z up',
-        ):
-            self.go_home()
-            return {
-                'success': False,
-                'slot': slot,
-                'object_id': object_id,
-                'message': 'delivery z up failed',
-            }
+            if not self.verify_product_unload(object_id):
+                self.go_home()
+                return {
+                    'success': False,
+                    'slot': slot,
+                    'object_id': object_id,
+                    'message': 'product unload verification failed after recovery',
+                }
 
         # 11. 웨이포인트 역순으로 홈 복귀
-        if not self.return_from_delivery(delivery_idx):
+        if not self.return_from_delivery(target_delivery_idx):
             return {
                 'success': False,
                 'slot': slot,
