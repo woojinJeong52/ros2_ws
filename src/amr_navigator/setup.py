@@ -18,6 +18,7 @@ setup(
             'launch/yaml_waypoint_follower.launch.py',
             'launch/yaml_autonomous_waypoint_follower.launch.py',
             'launch/goal_pose_generator.launch.py',
+            'launch/waypoint_marker_publisher.launch.py',
         ]),
     ],
     install_requires=['setuptools'],
@@ -37,6 +38,7 @@ setup(
             'waypoint_follower_client_3_12 = amr_navigator.waypoint_follower_client_3_12:main',
             'pose_to_waypoint = amr_navigator.pose_to_waypoint:main',
             'goal_pose_generator = amr_navigator.goal_pose_generator:main',
+            'waypoint_marker_publisher = amr_navigator.waypoint_marker_publisher:main',
         ],
     },
 )

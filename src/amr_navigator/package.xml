@@ -13,6 +13,7 @@
   <depend>sensor_msgs</depend>
   <depend>nav2_msgs</depend>
   <depend>ament_index_python</depend>
+  <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
   <depend>std_srvs</depend>
   <exec_depend>robocup_navigator</exec_depend>

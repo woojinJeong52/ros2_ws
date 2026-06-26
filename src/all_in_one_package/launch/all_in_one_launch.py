@@ -73,6 +73,19 @@ def generate_launch_description():
             ]
         ),
 
+        # Waypoint marker publisher for RViz visualization
+        TimerAction(
+            period=9.0,
+            actions=[
+                Node(
+                    package='amr_navigator',
+                    executable='waypoint_marker_publisher',
+                    name='waypoint_marker_publisher',
+                    output='screen',
+                ),
+            ]
+        ),
+
         # Sixth Launch: amr_navigator yaml waypoint follower after 22 seconds
         # TimerAction(
         #     period=10.0,

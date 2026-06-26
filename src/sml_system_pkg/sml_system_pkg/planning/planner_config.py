@@ -32,7 +32,7 @@ ASSEMBLY_PAIR_TIME = 12.5     # [s/connection]
 DISASSEMBLY_PAIR_TIME = 12.5  # [s/disconnection]
 
 # AMR 적재 제약
-MAX_RAW_CAPACITY = 5
+MAX_RAW_CAPACITY = 6
 MAX_PRODUCT_CAPACITY = 1
 
 # 대회 arena_layout에는 포함되지 않는 AMR의 시작/복귀 지점.
