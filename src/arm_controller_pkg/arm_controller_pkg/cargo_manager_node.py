@@ -15,7 +15,7 @@ MATERIAL_NAMES = {
 }
 
 PRODUCT_SLOT = 1
-MATERIAL_SLOTS = [2, 3, 4, 5, 6]
+MATERIAL_SLOTS = [2, 3, 4, 5, 6, 7]
 
 
 class CargoManagerNode(Node):
