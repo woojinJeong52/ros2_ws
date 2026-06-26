@@ -16,7 +16,9 @@ class WaypointMarkerPublisher(Node):
         self.declare_parameter('waypoints_file', '')
         self.declare_parameter('marker_topic', '/waypoint_markers')
         self.declare_parameter('publish_period_sec', 1.0)
-        self.declare_parameter('marker_scale', 0.22)
+        self.declare_parameter('arrow_length', 0.45)
+        self.declare_parameter('arrow_shaft_diameter', 0.07)
+        self.declare_parameter('arrow_head_diameter', 0.16)
         self.declare_parameter('text_scale', 0.22)
         self.declare_parameter('text_z_offset', 0.35)
         self.declare_parameter('red', 1.0)
@@ -105,7 +107,7 @@ class WaypointMarkerPublisher(Node):
                 continue
 
             marker_array.markers.append(
-                self._make_sphere_marker(marker_id, frame_id, str(name), pose)
+                self._make_arrow_marker(marker_id, frame_id, str(name), pose)
             )
             marker_id += 1
             marker_array.markers.append(
@@ -151,22 +153,25 @@ class WaypointMarkerPublisher(Node):
         except Exception:
             return None
 
-    def _make_sphere_marker(
+    def _make_arrow_marker(
         self,
         marker_id: int,
         frame_id: str,
         name: str,
         pose: Dict[str, float],
     ) -> Marker:
-        marker = self._base_marker(marker_id, frame_id, name, 'waypoint_points')
-        marker.type = Marker.SPHERE
-        marker.scale.x = float(self.get_parameter('marker_scale').value)
-        marker.scale.y = marker.scale.x
-        marker.scale.z = marker.scale.x
+        marker = self._base_marker(marker_id, frame_id, name, 'waypoint_arrows')
+        marker.type = Marker.ARROW
+        marker.scale.x = float(self.get_parameter('arrow_length').value)
+        marker.scale.y = float(self.get_parameter('arrow_shaft_diameter').value)
+        marker.scale.z = float(self.get_parameter('arrow_head_diameter').value)
         marker.pose.position.x = pose['x']
         marker.pose.position.y = pose['y']
         marker.pose.position.z = pose['z'] + 0.08
-        marker.pose.orientation.w = 1.0
+        marker.pose.orientation.x = pose['qx']
+        marker.pose.orientation.y = pose['qy']
+        marker.pose.orientation.z = pose['qz']
+        marker.pose.orientation.w = pose['qw']
         return marker
 
     def _make_text_marker(
