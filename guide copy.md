@@ -436,15 +436,13 @@ CANCELED: 액션 cancel 요청
 
 ros2 launch all_in_one_package all_in_one_launch.py
 
-ros2 run robocup_navigator robocup_navigator
+ros2 run robocup_navigator robocup_navigator --ros-args -p side_mode:=A
 
 ros2 launch amr_robot_launch amr_robot.launch.py
 
 ros2 run sml_system_pkg mock_wb_node
 
 ros2 run sml_system_pkg sml_planning_node
-
-> (0624 update) ros2 run sml_system_pkg sml_planning_node06_24
 
 ros2 run sml_system_pkg sml_manager_node
 
